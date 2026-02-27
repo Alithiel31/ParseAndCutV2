@@ -10,8 +10,8 @@
 <body>
     <div class="container">
         <header>
-            <h1>🎓 Assistant de Cours <span>IA</span></h1>
-            <p>Transcription haute fidélité via Groq & Llama 3</p>
+            <h1>🎓 Assistant Transcripteur-facile ! <span>IA</span></h1>
+            <p>Transcription via Groq & Llama 3</p>
         </header>
 
         <main class="card">
@@ -22,7 +22,7 @@
                     <input type="file" id="audioFile" accept="audio/*" hidden>
                 </label>
                 <div id="fileName" class="file-name-display"></div>
-                <button id="submitBtn" class="btn-primary">Générer la fiche de révision</button>
+                <button id="submitBtn" class="btn-primary">Générer le résumé de l'audio </button>
             </div>
 
             <div id="loader" class="hidden">
@@ -32,7 +32,7 @@
 
             <section id="resultArea" class="hidden">
                 <div class="result-header">
-                    <h2>📝 Fiche de Révision</h2>
+                    <h2>📝 Résume audio :</h2>
                     <button id="copyBtn" class="btn-secondary">Copier le texte</button>
                 </div>
                 <div id="output" class="markdown-body"></div>
