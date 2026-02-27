@@ -1,61 +1,60 @@
-🎓 Meetup Killer - IA Course Assistant
-🇫🇷 Français
-À propos
-Meetup Killer est un assistant intelligent hébergé sur Raspberry Pi qui transforme vos enregistrements audio de cours ou de réunions en fiches de révision structurées en Markdown. Il utilise l'API Groq pour une transcription ultra-rapide (Whisper) et une synthèse intelligente (Llama 3).
+# 🎓 Meetup Killer — Assistant de Cours IA
 
-Fonctionnalités
-🌐 Interface Web : Upload simple par glisser-déposer.
+[![Docker](https://img.shields.io/badge/Docker-Enabled-blue?logo=docker)](https://www.docker.com/)
+[![Groq](https://img.shields.io/badge/Powered%20by-Groq-orange)](https://groq.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-⚡ Vitesse : Transcription et résumé en quelques secondes via Groq Cloud.
 
-🐳 Dockerisé : Environnement isolé avec FFmpeg pré-installé.
 
-📱 Responsive : Accessible depuis votre PC, tablette ou smartphone sur le réseau local.
+---
 
-Installation Rapide
-Cloner le projet sur le Raspberry Pi :
+## ReadMe : Français
 
-Bash
-git clone <votre-url-repo>
-cd mon-script-ia
-Configurer les variables d'environnement :
-Créez un fichier .env avec votre clé API Groq :
+### À propos
+**Meetup Killer** est un assistant intelligent conçu pour être hébergé sur un **Raspberry Pi** (via Docker). Il transforme vos enregistrements audio de cours ou de réunions en fiches de révision structurées au format Markdown.
 
-Extrait de code
-GROQ_API_KEY=votre_cle_ici
-LANGUAGE=fr
-Lancer avec Docker :
+Grâce à l'API **Groq**, le traitement est quasi instantané :
+* **Transcription** : Whisper-Large-V3 (le plus haut niveau de précision).
+* **Synthèse** : Llama 3 (70B) pour une structuration académique parfaite.
 
-Bash
-docker build -t meetup-killer .
-docker run -d -p 80:5000 --name meetup-app --env-file .env -v $(pwd):/app meetup-killer
-🇬🇧 English
-About
-Meetup Killer is an AI-powered assistant hosted on a Raspberry Pi that converts your course or meeting audio recordings into structured Markdown study notes. It leverages the Groq API for ultra-fast transcription (Whisper) and intelligent summarization (Llama 3).
+### Fonctionnalités
+- 🌐 **Interface Web moderne** : Une UI "Glassmorphism" pour envoyer vos fichiers.
+- ✂️ **Auto-splitting** : Découpage automatique des gros fichiers audio pour respecter les limites d'API.
+- 🐳 **Prêt pour Docker** : FFmpeg et Python sont pré-configurés dans un conteneur léger.
+- ⚡ **Performance** : Délégue le calcul lourd au Cloud (Groq) pour ne pas ralentir le Raspberry Pi.
 
-Features
-🌐 Web Interface: Simple drag-and-drop upload.
+### Installation
+1.  **Cloner le dépôt** :
+    ```bash
+    git clone [https://github.com/votre-compte/meetup-killer.git](https://github.com/votre-compte/meetup-killer.git)
+    cd meetup-killer
+    ```
+2.  **Configurer le `.env`** :
+    Créez un fichier `.env` à la racine :
+    ```env
+    GROQ_API_KEY=votre_cle_api
+    LANGUAGE=fr
+    ```
+3.  **Déployer avec Docker** :
+    ```bash
+    docker build -t meetup-killer .
+    docker run -d -p 80:5000 --name meetup-app --env-file .env -v $(pwd):/app meetup-killer
+    ```
+4.  **Accéder à l'outil** : Ouvrez votre navigateur sur `http://<IP_DU_RASPBERRY>`.
 
-⚡ Performance: Transcription and synthesis in seconds via Groq Cloud.
+---
 
-🐳 Dockerized: Fully isolated environment with pre-installed FFmpeg.
+## ReadMe : English
 
-📱 Responsive: Access it from your PC, tablet, or smartphone on your local network.
+### About
+**Meetup Killer** is an AI assistant designed to be hosted on a **Raspberry Pi**. It converts course or meeting audio recordings into structured Markdown study notes.
 
-Quick Setup
-Clone the project onto your Raspberry Pi:
+Using the **Groq API**, processing is near-instantaneous:
+* **Transcription**: Whisper-Large-V3 (highest accuracy level).
+* **Synthesis**: Llama 3 (70B) for perfect academic structuring.
 
-Bash
-git clone <your-repo-url>
-cd mon-script-ia
-Configure environment variables:
-Create a .env file with your Groq API key:
-
-Extrait de code
-GROQ_API_KEY=your_key_here
-LANGUAGE=fr
-Run with Docker:
-
-Bash
-docker build -t meetup-killer .
-docker run -d -p 80:5000 --name meetup-app --env-file .env -v $(pwd):/app meetup-killer
+### Features
+- 🌐 **Modern Web UI**: Glassmorphism design for easy file uploading.
+- ✂️ **Auto-splitting**: Automatically splits large audio files to comply with API limits.
+- 🐳 **Docker Ready**: FFmpeg and Python are pre-configured in a lightweight container.
+- ⚡ **Performance
