@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IA Course Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎓 Assistant de Cours <span>IA</span></h1>
+            <p>Transcription haute fidélité via Groq & Llama 3</p>
+        </header>
+
+        <main class="card">
+            <div class="upload-section">
+                <label for="audioFile" class="drop-zone" id="dropZone">
+                    <span class="icon">☁️</span>
+                    <span class="text">Glissez votre fichier audio ici</span>
+                    <input type="file" id="audioFile" accept="audio/*" hidden>
+                </label>
+                <div id="fileName" class="file-name-display"></div>
+                <button id="submitBtn" class="btn-primary">Générer la fiche de révision</button>
+            </div>
+
+            <div id="loader" class="hidden">
+                <div class="spinner"></div>
+                <p id="statusText">Analyse audio en cours...</p>
+            </div>
+
+            <section id="resultArea" class="hidden">
+                <div class="result-header">
+                    <h2>📝 Fiche de Révision</h2>
+                    <button id="copyBtn" class="btn-secondary">Copier le texte</button>
+                </div>
+                <div id="output" class="markdown-body"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

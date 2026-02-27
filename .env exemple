@@ -1,0 +1,8 @@
+# Clé API obtenue sur https://console.groq.com/
+GROQ_API_KEY=
+
+# Langue du cours (fr, en, es, etc.)
+LANGUAGE=fr
+
+#Port
+FLASK_PORT=5000
