@@ -5,13 +5,26 @@ from groq import Groq
 from dotenv import load_dotenv
 
 # --- CONFIGURATION ---
-load_dotenv()
+if not os.getenv("RAILWAY_ENVIRONMENT"):
+    load_dotenv()
 
 app = Flask(__name__, 
             static_folder='static', 
             template_folder='templates')
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# Récupération sécurisée de la clé
+api_key = os.getenv("GROQ_API_KEY")
+
+if not api_key:
+    # Ce print sera visible dans les logs Railway pour confirmer le problème
+    print("CRITICAL ERROR: GROQ_API_KEY is not set in environment variables.")
+    # On évite d'instancier Groq si la clé est absente pour ne pas crasher direct
+    client = None
+else:
+    client = Groq(api_key=api_key)
+
+# IMPORTANT : Railway définit sa propre variable PORT
+PORT = int(os.getenv("PORT", 5000))
 FFMPEG_PATH = "ffmpeg" 
 LANGUAGE = os.getenv("LANGUAGE", "fr")
 
@@ -50,6 +63,8 @@ def index():
 
 @app.route('/process', methods=['POST'])
 def process():
+    if not client:
+        return jsonify({"error": "Configuration API Groq manquante sur le serveur"}), 500
     if 'audio' not in request.files:
         return jsonify({"error": "Aucun fichier reçu"}), 400
     
@@ -102,4 +117,4 @@ def process():
             os.remove(input_path)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=PORT)
