@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # On expose le port utilisé 
-EXPOSE 5000
+# EXPOSE 5000 afin de déployer sur railway
 
 # On lance le serveur web
 CMD ["python", "meetupKiller.py"]
