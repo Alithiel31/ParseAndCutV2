@@ -3,6 +3,7 @@ import subprocess
 from flask import Flask, render_template, request, jsonify
 from groq import Groq
 from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
 
 # --- CONFIGURATION ---
 if not os.getenv("RAILWAY_ENVIRONMENT"):
@@ -12,6 +13,9 @@ app = Flask(__name__,
             static_folder='static', 
             template_folder='templates')
 
+# Autorise les fichiers jusqu'à 100 Mo 
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
+
 # Essaye de lire la variable directement
 api_key = os.environ.get("GROQ_API_KEY")
 
@@ -20,7 +24,7 @@ client = None
 
 if api_key:
     try:
-        client = Groq(api_key=api_key)
+        client = Groq(api_key=api_key, timeout=60.0)
         print(f"✅ Groq Client initialisé (Clé: {api_key[:5]}...)")
     except Exception as e:
         print(f"❌ Erreur lors de l'initialisation Groq: {e}")
@@ -70,12 +74,14 @@ def index():
 @app.route('/process', methods=['POST'])
 def process():
     if not client:
-        return jsonify({"error": "Configuration API Groq manquante sur le serveur"}), 500
+        return jsonify({"error": "Configuration API Groq manquante"}), 500
     if 'audio' not in request.files:
         return jsonify({"error": "Aucun fichier reçu"}), 400
     
     audio_file = request.files['audio']
-    input_path = os.path.join("/tmp", audio_file.filename)
+    # Sécurisation du nom pour FFmpeg
+    filename = secure_filename(audio_file.filename)
+    input_path = os.path.join("/tmp", filename)
     audio_file.save(input_path)
 
     try:
