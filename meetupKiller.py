@@ -21,7 +21,8 @@ if not api_key:
     # On évite d'instancier Groq si la clé est absente pour ne pas crasher direct
     client = None
 else:
-    client = Groq(api_key=api_key)
+    print(f"Succès : Clé chargée (début: {api_key[:5]})")
+client = Groq(api_key=api_key)
 
 # IMPORTANT : Railway définit sa propre variable PORT
 PORT = int(os.getenv("PORT", 5000))
