@@ -1,0 +1,40 @@
+name: CI Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        # Installation de FFmpeg car ton code l'utilise au démarrage
+        sudo apt-get update && sudo apt-get install -y ffmpeg
+
+    - name: Lint with pyflakes
+      run: |
+        pip install pyflakes
+        pyflakes meetupKiller.py
+
+    - name: Test App Initialization
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        RAILWAY_ENVIRONMENT: "true" # On simule Railway pour éviter de chercher un .env
+      run: |
+        # On vérifie si l'app Flask peut être importée sans erreur
+        python -c "from meetupKiller import app; print('✅ Application Flask initialisée avec succès !')"

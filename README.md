@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 
-
+/!\ Little Update, the service is host on Railway : https://parseandcutv2-production.up.railway.app/
 ---
 
 ## ReadMe : Français
