@@ -12,17 +12,22 @@ app = Flask(__name__,
             static_folder='static', 
             template_folder='templates')
 
-# Récupération sécurisée de la clé
-api_key = os.getenv("GROQ_API_KEY")
+# Essaye de lire la variable directement
+api_key = os.environ.get("GROQ_API_KEY")
 
-if not api_key:
-    # Ce print sera visible dans les logs Railway pour confirmer le problème
-    print("CRITICAL ERROR: GROQ_API_KEY is not set in environment variables.")
-    # On évite d'instancier Groq si la clé est absente pour ne pas crasher direct
-    client = None
+# Initialisation prudente
+client = None
+
+if api_key:
+    try:
+        client = Groq(api_key=api_key)
+        print(f"✅ Groq Client initialisé (Clé: {api_key[:5]}...)")
+    except Exception as e:
+        print(f"❌ Erreur lors de l'initialisation Groq: {e}")
 else:
-    print(f"Succès : Clé chargée (début: {api_key[:5]})")
-client = Groq(api_key=api_key)
+    print("⚠️ WARNING: GROQ_API_KEY est toujours invisible pour Python.")
+
+# On ne bloque pas l'exécution ici, on gérera l'absence de client dans la route /process
 
 # IMPORTANT : Railway définit sa propre variable PORT
 PORT = int(os.getenv("PORT", 5000))
