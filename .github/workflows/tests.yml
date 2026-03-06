@@ -38,3 +38,12 @@ jobs:
       run: |
         # On vérifie si l'app Flask peut être importée sans erreur
         python -c "from meetupKiller import app; print('✅ Application Flask initialisée avec succès !')"
+    
+    - name: Test Routes
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      run: |
+        # Lance l'app en arrière-plan, attend 2 secondes, puis teste la home
+        python meetupKiller.py & 
+        sleep 2
+        curl -f http://127.0.0.1:5000/ || exit 1
