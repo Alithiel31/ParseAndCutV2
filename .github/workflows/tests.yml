@@ -81,7 +81,8 @@ jobs:
       run: |
         RESPONSE=$(curl -sf http://127.0.0.1:5000/health)
         echo "Réponse /health : $RESPONSE"
-        echo $RESPONSE | grep -q '"status": "ok"' || exit 1
+        STATUS=$(echo $RESPONSE | jq -r '.status')
+        [ "$STATUS" = "ok" ] || exit 1
 
     - name: Test route /process sans fichier (doit renvoyer 400)
       run: |
