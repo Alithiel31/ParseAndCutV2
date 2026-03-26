@@ -1,0 +1,19 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true
+  },
+  "rules": {
+    "no-unused-vars": "warn",
+    "no-undef": "warn",
+    "eqeqeq": "error",
+    "no-console": "off",
+    "semi": ["error", "always"],
+    "quotes": ["warn", "single"],
+    "no-var": "error",
+    "prefer-const": "warn"
+  },
+  "globals": {
+    "marked": "readonly"
+  }
+}

@@ -1,3 +1,16 @@
+# Serveur web production
+gunicorn
+
+# API Groq
 groq
-python-dotenv
+
+# Framework web
 flask
+
+# Sécurisation des noms de fichiers (utilisé dans le code)
+werkzeug
+
+# Variables d'environnement
+python-dotenv
+
+flake8

@@ -1,90 +1,165 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const fileInput = document.getElementById('audioFile');
-    const dropZone = document.getElementById('dropZone'); // Ajouté pour le drag & drop
-    const fileName = document.getElementById('fileName');
-    const submitBtn = document.getElementById('submitBtn');
-    const loader = document.getElementById('loader');
-    const resultArea = document.getElementById('resultArea');
-    const output = document.getElementById('output');
-    const copyBtn = document.getElementById('copyBtn');
+    const fileInput   = document.getElementById('audioFile');
+    const dropZone    = document.getElementById('dropZone');
+    const fileName    = document.getElementById('fileName');
+    const submitBtn   = document.getElementById('submitBtn');
+    const loader      = document.getElementById('loader');
+    const statusText  = document.getElementById('statusText');
+    const resultArea  = document.getElementById('resultArea');
+    const output      = document.getElementById('output');
+    const copyBtn     = document.getElementById('copyBtn');
+    const statsBar    = document.getElementById('statsBar');
+    const errorBanner = document.getElementById('errorBanner');
 
-    // 1. GESTION DU DRAG & DROP
-    ['dragover', 'dragleave', 'drop'].forEach(name => {
-        dropZone.addEventListener(name, e => {
-            e.preventDefault();
-            e.stopPropagation();
+    const MAX_SIZE_MB = 100;
+
+    // Étapes affichées pendant le traitement
+    const STEPS = [
+        { id: 'step-upload',  label: '📤 Envoi'        },
+        { id: 'step-cut',     label: '✂️ Découpage'     },
+        { id: 'step-whisper', label: '🎙️ Transcription' },
+        { id: 'step-llm',     label: '🧠 Structuration' },
+    ];
+
+    // Injection des badges dans le loader
+    const progressEl = document.getElementById('progressSteps');
+    STEPS.forEach(s => {
+        const span = document.createElement('span');
+        span.className = 'step-badge';
+        span.id = s.id;
+        span.textContent = s.label;
+        progressEl.appendChild(span);
+    });
+
+    function setStep(activeId) {
+        STEPS.forEach(s => {
+            const el = document.getElementById(s.id);
+            el.classList.remove('active', 'done');
+            const idx = STEPS.findIndex(x => x.id === s.id);
+            const activeIdx = STEPS.findIndex(x => x.id === activeId);
+            if (idx < activeIdx) el.classList.add('done');
+            else if (idx === activeIdx) el.classList.add('active');
         });
-    });
+    }
 
-    dropZone.addEventListener('drop', e => {
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            fileInput.files = files; // On injecte le fichier glissé dans l'input
-            fileName.textContent = `Fichier prêt : ${files[0].name}`;
-            console.log("Fichier reçu via Drop:", files[0].name);
-        }
-    });
+    function showError(msg) {
+        errorBanner.textContent = '⚠️ ' + msg;
+        errorBanner.classList.remove('hidden');
+    }
 
-    // 2. AFFICHAGE NOM (CLIC CLASSIQUE)
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files.length > 0) {
-            fileName.textContent = `Fichier prêt : ${fileInput.files[0].name}`;
-            console.log("Fichier sélectionné via clic:", fileInput.files[0].name);
-        }
-    });
+    function clearError() {
+        errorBanner.classList.add('hidden');
+        errorBanner.textContent = '';
+    }
 
-    // 3. ENVOI AU SERVEUR
-    submitBtn.addEventListener('click', async () => {
-        if (fileInput.files.length === 0) {
-            alert("Sélectionnez d'abord un fichier audio.");
+    function setFile(file) {
+        if (!file) return;
+        if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+            showError(`Fichier trop volumineux (max ${MAX_SIZE_MB} Mo).`);
             return;
         }
+        clearError();
+        fileName.textContent = `📎 ${file.name} — ${(file.size / 1024 / 1024).toFixed(1)} Mo`;
+    }
 
-        console.log("Début de l'envoi vers Railway...");
+    // --- Drag & drop ---
+    dropZone.addEventListener('dragover', e => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            setFile(files[0]);
+        }
+    });
+
+    // --- Sélection classique ---
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) setFile(fileInput.files[0]);
+    });
+
+    // --- Envoi ---
+    submitBtn.addEventListener('click', async () => {
+        if (fileInput.files.length === 0) {
+            showError("Sélectionnez d'abord un fichier audio.");
+            return;
+        }
+        clearError();
+        resultArea.classList.add('hidden');
+        statsBar.classList.add('hidden');
+
         const formData = new FormData();
         formData.append('audio', fileInput.files[0]);
 
-        // Interface
         submitBtn.disabled = true;
         loader.classList.remove('hidden');
-        resultArea.classList.add('hidden');
+        setStep('step-upload');
+        statusText.textContent = 'Envoi du fichier…';
+
+        // Simule la progression (le serveur ne streame pas encore)
+        const stepTimings = [
+            { id: 'step-cut',     delay: 1500, label: 'Découpage en cours…'       },
+            { id: 'step-whisper', delay: 4000, label: 'Transcription Whisper…'     },
+            { id: 'step-llm',     delay: 9000, label: 'Structuration avec Llama…'  },
+        ];
+        const timers = stepTimings.map(({ id, delay, label }) =>
+            setTimeout(() => { setStep(id); statusText.textContent = label; }, delay)
+        );
 
         try {
-            const response = await fetch('/process', {
-                method: 'POST',
-                body: formData
-            });
+            const response = await fetch('/process', { method: 'POST', body: formData });
+            timers.forEach(clearTimeout);
 
             if (!response.ok) {
-                // Si Railway renvoie une erreur 413, c'est que le fichier est trop gros
-                if (response.status === 413) throw new Error("Fichier trop volumineux pour le serveur.");
-                const errorData = await response.json();
-                throw new Error(errorData.error || "Erreur serveur inconnue");
+                const err = await response.json().catch(() => ({ error: `Erreur HTTP ${response.status}` }));
+                throw new Error(err.error || `Erreur ${response.status}`);
             }
 
             const data = await response.json();
 
             if (data.markdown) {
+                // Stats
+                if (data.stats) {
+                    statsBar.innerHTML = `
+                        <span>🔀 ${data.stats.chunks} chunk(s)</span>
+                        <span>📝 ${data.stats.transcription_chars.toLocaleString()} caractères transcrits</span>
+                    `;
+                    statsBar.classList.remove('hidden');
+                }
+
                 output.innerHTML = marked.parse(data.markdown);
                 resultArea.classList.remove('hidden');
-                console.log("Transcription réussie !");
+
+                // Marque toutes les étapes comme terminées
+                STEPS.forEach(s => {
+                    const el = document.getElementById(s.id);
+                    el.classList.remove('active');
+                    el.classList.add('done');
+                });
+                statusText.textContent = '✅ Fiche générée !';
+                setTimeout(() => resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
             }
+
         } catch (error) {
-            console.error("Erreur Fetch:", error);
-            alert("Erreur : " + error.message);
+            timers.forEach(clearTimeout);
+            showError(error.message);
         } finally {
-            loader.classList.add('hidden');
+            setTimeout(() => loader.classList.add('hidden'), 800);
             submitBtn.disabled = false;
         }
     });
 
-    // 4. COPIE
+    // --- Copie ---
     copyBtn.addEventListener('click', () => {
-        const textToCopy = output.innerText;
-        navigator.clipboard.writeText(textToCopy).then(() => {
-            const originalText = copyBtn.textContent;
-            copyBtn.textContent = "Copié ! ✅";
-            setTimeout(() => copyBtn.textContent = originalText, 2000);
+        navigator.clipboard.writeText(output.innerText).then(() => {
+            const orig = copyBtn.textContent;
+            copyBtn.textContent = '✅ Copié !';
+            setTimeout(() => copyBtn.textContent = orig, 2000);
         });
     });
 });

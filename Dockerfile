@@ -1,24 +1,21 @@
-# On utilise une version légère de Python
 FROM python:3.10-slim
 
-# On installe FFmpeg
-RUN apt-get update && apt-get install -y ffmpeg && apt-get clean
+# FFmpeg + nettoyage cache en une seule couche (réduit la taille de l'image)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Empêche Python de mettre en cache les logs 
 ENV PYTHONUNBUFFERED=1
+# Évite d'écrire des .pyc inutiles
+ENV PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
 
-# On installe les bibliothèques
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# On copie tout le projet 
-
 COPY . .
 
-# On expose le port utilisé 
-# EXPOSE 5000 afin de déployer sur railway
-
-# On lance le serveur web
-CMD ["python", "meetupKiller.py"]
+# Gunicorn remplace le serveur Flask de dev (bien plus robuste en prod)
+CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "2", "--timeout", "300", "meetupKiller:app"]
