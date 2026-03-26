@@ -1,0 +1,28 @@
+{
+  "name": "meetup-killer",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Transcription et résumé de cours audio avec Whisper et Llama 3",
+  "scripts": {
+    "lint": "npm run lint:py && npm run lint:js && npm run lint:css",
+    "lint:py": "python -m flake8 meetupKiller.py",
+    "lint:js": "npx eslint static/js/main.js",
+    "lint:css": "npx stylelint static/css/style.css"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alithiel31/ParseAndCutV2.git"
+  },
+  "keywords": [],
+  "author": "Alithiel31",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Alithiel31/ParseAndCutV2/issues"
+  },
+  "homepage": "https://github.com/Alithiel31/ParseAndCutV2#readme",
+  "devDependencies": {
+    "eslint": "^10.0.0",
+    "stylelint": "^16.0.0",
+    "stylelint-config-standard": "^36.0.0"
+  }
+}

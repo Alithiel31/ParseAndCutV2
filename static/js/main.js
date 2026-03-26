@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Envoi ---
     submitBtn.addEventListener('click', async () => {
         if (fileInput.files.length === 0) {
-            showError("Sélectionnez d'abord un fichier audio.");
+            showError('Sélectionnez d\'abord un fichier audio.');
             return;
         }
         clearError();

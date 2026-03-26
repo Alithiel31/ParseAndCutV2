@@ -287,7 +287,7 @@ def process():
         logger.error(f"Erreur API Groq: {e}")
         return jsonify({"error": f"Erreur API Groq : {e.message}"}), 502
 
-    except Exception as e:
+    except Exception:
         logger.exception("Erreur inattendue dans /process")
         return jsonify({"error": "Erreur interne du serveur"}), 500
 

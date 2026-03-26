@@ -37,7 +37,7 @@ header p { color: var(--text-dim); margin-top: 6px; }
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 2rem;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 50%);
 }
 
 /* --- Drop zone --- */
@@ -52,10 +52,11 @@ header p { color: var(--text-dim); margin-top: 6px; }
     transition: border-color 0.3s, background 0.3s;
     gap: 8px;
 }
+
 .drop-zone:hover,
 .drop-zone.drag-over {
     border-color: var(--primary);
-    background: rgba(99, 102, 241, 0.07);
+    background: rgb(99 102 241 / 7%);
 }
 .drop-zone .icon { font-size: 2.5rem; }
 .drop-zone .text { color: var(--text-dim); font-size: 0.95rem; }
@@ -83,6 +84,7 @@ header p { color: var(--text-dim); margin-top: 6px; }
     transition: background 0.2s, transform 0.1s;
     margin-top: 8px;
 }
+
 .btn-primary:hover:not(:disabled) {
     background: var(--primary-hover);
     transform: translateY(-1px);
@@ -99,7 +101,7 @@ header p { color: var(--text-dim); margin-top: 6px; }
     cursor: pointer;
     transition: background 0.2s;
 }
-.btn-secondary:hover { background: rgba(99, 102, 241, 0.1); }
+.btn-secondary:hover { background: rgb(99 102 241 / 10%); }
 
 /* --- Loader + progress --- */
 .hidden { display: none; }
@@ -116,6 +118,7 @@ header p { color: var(--text-dim); margin-top: 6px; }
     animation: spin 1s linear infinite;
     margin: 20px auto;
 }
+
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
 /* Barre de progression textuelle */
@@ -126,6 +129,7 @@ header p { color: var(--text-dim); margin-top: 6px; }
     margin-top: 12px;
     flex-wrap: wrap;
 }
+
 .step-badge {
     font-size: 0.78rem;
     padding: 4px 10px;
@@ -134,12 +138,14 @@ header p { color: var(--text-dim); margin-top: 6px; }
     color: var(--text-dim);
     transition: background 0.4s, color 0.4s;
 }
+
 .step-badge.active {
     background: var(--primary);
     color: white;
 }
+
 .step-badge.done {
-    background: rgba(34, 197, 94, 0.2);
+    background: rgb(34 197 94 / 20%);
     color: var(--success);
 }
 
@@ -162,7 +168,7 @@ header p { color: var(--text-dim); margin-top: 6px; }
     color: var(--text-dim);
     margin-bottom: 12px;
     padding: 8px 12px;
-    background: rgba(255,255,255,0.03);
+    background: rgb(255 255 255 / 3%);
     border-radius: 6px;
     border: 1px solid var(--border);
 }
@@ -177,6 +183,7 @@ header p { color: var(--text-dim); margin-top: 6px; }
     line-height: 1.7;
     font-size: 0.95rem;
 }
+
 .markdown-body h1, .markdown-body h2 {
     color: var(--primary);
     border-bottom: 1px solid var(--border);
@@ -184,6 +191,7 @@ header p { color: var(--text-dim); margin-top: 6px; }
 }
 .markdown-body h3 { color: #a5b4fc; }
 .markdown-body ul { padding-left: 20px; }
+
 .markdown-body blockquote {
     border-left: 3px solid var(--primary);
     margin-left: 0;
@@ -191,8 +199,9 @@ header p { color: var(--text-dim); margin-top: 6px; }
     color: var(--text-dim);
     font-style: italic;
 }
+
 .markdown-body code {
-    background: rgba(99,102,241,0.15);
+    background: rgb(99 102 241 / 15%);
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 0.88em;
@@ -200,7 +209,7 @@ header p { color: var(--text-dim); margin-top: 6px; }
 
 /* Message d'erreur inline */
 .error-banner {
-    background: rgba(239,68,68,0.1);
+    background: rgb(239 68 68 / 10%);
     border: 1px solid var(--error);
     color: #fca5a5;
     border-radius: 8px;

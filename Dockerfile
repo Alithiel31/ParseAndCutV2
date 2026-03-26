@@ -18,4 +18,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Gunicorn remplace le serveur Flask de dev (bien plus robuste en prod)
-CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "2", "--timeout", "300", "meetupKiller:app"]
+CMD gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 300 meetupKiller:app
