@@ -1,11 +1,15 @@
-# Serveur web production
-gunicorn==26.0.0
+# Serveur ASGI (dev + prod, remplace Flask/Gunicorn)
+fastapi==0.139.0
+uvicorn==0.51.0
+
+# Upload de fichiers multipart (requis par FastAPI pour UploadFile)
+python-multipart==0.0.32
+
+# Templates HTML (Jinja2Templates)
+jinja2==3.1.6
 
 # API Groq
 groq==1.5.0
-
-# Framework web
-flask==3.1.3
 
 # Sécurisation des noms de fichiers (utilisé dans le code)
 werkzeug==3.1.8

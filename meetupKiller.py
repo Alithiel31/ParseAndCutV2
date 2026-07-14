@@ -2,7 +2,13 @@ import os
 import subprocess
 import logging
 import time
-from flask import Flask, render_template, request, jsonify
+import shutil
+from typing import Optional
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from groq import Groq, APIError, APITimeoutError
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
@@ -18,8 +24,9 @@ logger = logging.getLogger(__name__)
 if not os.getenv("RAILWAY_ENVIRONMENT"):
     load_dotenv()
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500 Mo pour les longs audios
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 # Extensions audio autorisées
 ALLOWED_EXTENSIONS = {'mp3', 'mp4', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac', 'opus'}
@@ -35,12 +42,22 @@ client  = None
 
 if api_key:
     try:
-        client = Groq(api_key=api_key, timeout=240.0)  # Aligné avec Gunicorn --timeout 300
+        client = Groq(api_key=api_key, timeout=240.0)  # Aligné avec le timeout serveur (300s)
         logger.info("✅ Groq Client initialisé")
     except Exception as e:
         logger.error(f"❌ Erreur init Groq: {e}")
 else:
     logger.warning("⚠️ GROQ_API_KEY manquante")
+
+
+# --- MODÈLES PYDANTIC ---
+
+class HealthResponse(BaseModel):
+    status: str
+    groq_ready: bool
+    language: str
+    chunk_duration_sec: int
+    allowed_extensions: list[str]
 
 
 # --- UTILITAIRES ---
@@ -120,7 +137,7 @@ def transcrire_chunk(path: str, retries: int = 2) -> str:
     """
     Transcrit un chunk audio via Groq Whisper.
     Retente automatiquement avec backoff exponentiel en cas de timeout.
-    2 tentatives max pour rester dans le timeout Gunicorn (300s).
+    2 tentatives max pour rester dans le timeout serveur (300s).
     """
     for attempt in range(retries):
         try:
@@ -175,45 +192,41 @@ TRANSCRIPTION :
 
 # --- ROUTES ---
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+@app.get('/')
+def index(request: Request):
+    return templates.TemplateResponse(request, "index.html")
 
 
-@app.route('/health')
+@app.get('/health', response_model=HealthResponse)
 def health():
-    """Endpoint de santé pour Railway et le monitoring."""
-    return jsonify({
-        "status":               "ok",
-        "groq_ready":           client is not None,
-        "language":             LANGUAGE,
-        "chunk_duration_sec":   CHUNK_DURATION,
-        "allowed_extensions":   sorted(ALLOWED_EXTENSIONS)
-    })
+    """Endpoint de santé pour le monitoring."""
+    return HealthResponse(
+        status="ok",
+        groq_ready=client is not None,
+        language=LANGUAGE,
+        chunk_duration_sec=CHUNK_DURATION,
+        allowed_extensions=sorted(ALLOWED_EXTENSIONS)
+    )
 
 
-@app.route('/process', methods=['POST'])
-def process():
+@app.post('/process')
+def process(audio: Optional[UploadFile] = File(None)):
 
     # --- Vérifications préalables ---
     if not client:
-        return jsonify({"error": "Configuration API Groq manquante sur le serveur"}), 503
+        raise HTTPException(status_code=503, detail="Configuration API Groq manquante sur le serveur")
 
-    if 'audio' not in request.files:
-        return jsonify({"error": "Aucun fichier audio reçu"}), 400
+    if audio is None or not audio.filename:
+        raise HTTPException(status_code=400, detail="Aucun fichier audio reçu")
 
-    audio_file = request.files['audio']
-
-    if not audio_file.filename:
-        return jsonify({"error": "Nom de fichier vide"}), 400
-
-    if not allowed_file(audio_file.filename):
-        return jsonify({
-            "error": f"Format non supporté. Formats acceptés : {', '.join(sorted(ALLOWED_EXTENSIONS))}"
-        }), 415
+    if not allowed_file(audio.filename):
+        raise HTTPException(
+            status_code=415,
+            detail=f"Format non supporté. Formats acceptés : {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+        )
 
     # --- Sauvegarde sécurisée ---
-    filename = secure_filename(audio_file.filename)
+    filename = secure_filename(audio.filename)
     if not filename:
         # Fallback si le nom contient uniquement des caractères non-ASCII
         filename = f"audio_{os.getpid()}.mp3"
@@ -223,7 +236,8 @@ def process():
     chunks_créés  = []
 
     try:
-        audio_file.save(input_path)
+        with open(input_path, "wb") as f:
+            shutil.copyfileobj(audio.file, f)
         size_mo = os.path.getsize(input_path) / 1024 / 1024
         logger.info(f"📥 Fichier reçu : {filename} ({size_mo:.1f} Mo)")
 
@@ -232,9 +246,10 @@ def process():
         chunks_créés = découper_audio(input_path)
 
         if not chunks_créés:
-            return jsonify({
-                "error": "Impossible de traiter le fichier audio (vide, corrompu, ou format non lisible par FFmpeg)"
-            }), 422
+            raise HTTPException(
+                status_code=422,
+                detail="Impossible de traiter le fichier audio (vide, corrompu, ou format non lisible par FFmpeg)"
+            )
 
         logger.info(f"✅ {len(chunks_créés)} chunk(s) prêts à transcrire")
 
@@ -248,9 +263,10 @@ def process():
             os.remove(path)  # Nettoyage immédiat après transcription
 
         if not texte_complet.strip():
-            return jsonify({
-                "error": "Transcription vide — audio silencieux, inaudible ou langue incorrecte ?"
-            }), 422
+            raise HTTPException(
+                status_code=422,
+                detail="Transcription vide — audio silencieux, inaudible ou langue incorrecte ?"
+            )
 
         logger.info(f"✅ Transcription complète : {len(texte_complet):,} caractères")
 
@@ -266,7 +282,7 @@ def process():
         markdown = completion.choices[0].message.content
         logger.info("✅ Fiche générée avec succès")
 
-        return jsonify({
+        return JSONResponse({
             "markdown": markdown,
             "stats": {
                 "chunks":               len(chunks_créés),
@@ -275,21 +291,24 @@ def process():
         })
 
     # --- Gestion d'erreurs granulaire ---
+    except HTTPException:
+        raise
+
     except subprocess.TimeoutExpired:
         logger.error("FFmpeg timeout global")
-        return jsonify({"error": "Le découpage audio a pris trop de temps"}), 504
+        raise HTTPException(status_code=504, detail="Le découpage audio a pris trop de temps")
 
     except RuntimeError as e:
         logger.error(f"Erreur transcription: {e}")
-        return jsonify({"error": str(e)}), 502
+        raise HTTPException(status_code=502, detail=str(e))
 
     except APIError as e:
         logger.error(f"Erreur API Groq: {e}")
-        return jsonify({"error": f"Erreur API Groq : {e.message}"}), 502
+        raise HTTPException(status_code=502, detail=f"Erreur API Groq : {e.message}")
 
     except Exception:
         logger.exception("Erreur inattendue dans /process")
-        return jsonify({"error": "Erreur interne du serveur"}), 500
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur")
 
     finally:
         # Nettoyage garanti même en cas d'exception à mi-parcours
@@ -303,5 +322,5 @@ def process():
 
 
 if __name__ == '__main__':
-    debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
-    app.run(host='0.0.0.0', port=PORT, debug=debug)
+    import uvicorn
+    uvicorn.run(app, host='0.0.0.0', port=PORT)
