@@ -3,10 +3,11 @@
 [![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-blue?logo=docker)](https://www.docker.com/)
 [![Groq](https://img.shields.io/badge/Powered%20by-Groq-orange)](https://groq.com/)
-[![Railway](https://img.shields.io/badge/Hosted%20on-Railway-blueviolet?logo=railway)](https://railway.app/)
+[![Déployé](https://img.shields.io/badge/Déployé-parseandcut.alithiel31.dev-blue)](https://parseandcut.alithiel31.dev)
+[![Cloudflare](https://img.shields.io/badge/Tunnel-Cloudflare-orange?logo=cloudflare)](https://www.cloudflare.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> 🚀 **Service en ligne** : [parseandcutv2-production.up.railway.app](https://parseandcutv2-production.up.railway.app/)
+> 🚀 **Service en ligne** : [parseandcut.alithiel31.dev](https://parseandcut.alithiel31.dev)
 
 ---
 
@@ -16,7 +17,7 @@
 
 **Meetup Killer** transforme vos enregistrements audio de cours ou de réunions en fiches de révision structurées au format Markdown.
 
-Initialement conçu pour tourner sur **Raspberry Pi**, il est aujourd'hui déployé sur **Railway** via Docker. Le traitement lourd est délégué à l'API **Groq** pour des performances maximales :
+Conçu pour tourner sur **Raspberry Pi**, il est déployé via **Docker** (conteneur backend + conteneur frontend [ParseAndCutPWA](../ParseAndCutPWA), orchestrés par `docker-compose.yml`), exposé publiquement via un **tunnel Cloudflare** — aucun port ouvert sur le routeur. Le traitement lourd est délégué à l'API **Groq** pour des performances maximales :
 
 - **Transcription** : Whisper Large V3 — précision maximale, multilingue
 - **Structuration** : Llama 3.3 (70B) — résumé, titres, définitions en Markdown
@@ -31,7 +32,7 @@ Initialement conçu pour tourner sur **Raspberry Pi**, il est aujourd'hui déplo
 | ✅ Validation robuste | Vérification type + taille côté client ET serveur |
 | 🔁 Retry automatique | Relance Whisper en cas de timeout réseau (backoff exponentiel) |
 | 🐳 Docker ready | FFmpeg + Gunicorn pré-configurés, image légère `python:3.10-slim` |
-| 📊 Endpoint `/health` | Monitoring Railway : état Groq, langue, extensions supportées |
+| 📊 Endpoint `/health` | Monitoring : état Groq, langue, extensions supportées |
 
 ### Formats audio supportés
 
@@ -95,13 +96,23 @@ Fiche de révision ✅
 
    > Sur Raspberry Pi, remplacez `localhost` par l'IP locale de votre machine.
 
-### Déploiement Railway
+### Déploiement (Docker + Raspberry Pi)
 
-1. Connectez votre dépôt GitHub à Railway
-2. Ajoutez la variable `GROQ_API_KEY` dans les paramètres du service
-3. Railway détecte le `Dockerfile` automatiquement et expose le port via `$PORT`
+C'est la méthode utilisée en production. Le `docker-compose.yml` de ce dépôt lance le
+backend (réseau interne, port **5000**) et le frontend [ParseAndCutPWA](../ParseAndCutPWA)
+(nginx, port **8091**) — voir [`DEPLOY_PI.md`](./DEPLOY_PI.md) pour la procédure complète
+(création du `docker context` vers le Pi, build, configuration de l'ingress Cloudflare).
 
-L'endpoint [`/health`](https://parseandcutv2-production.up.railway.app/health) permet de vérifier l'état du service à tout moment.
+```bash
+docker context use rpi
+docker compose up --build -d
+```
+
+Nginx (conteneur frontend) sert les fichiers statiques du PWA et reverse-proxy `/api/`
+vers le backend — same-origin, pas de CORS à gérer. Le tunnel Cloudflare gère le HTTPS
+et le nom de domaine `parseandcut.alithiel31.dev` — aucun certificat à gérer manuellement.
+
+L'endpoint [`/health`](https://parseandcut.alithiel31.dev/api/health) permet de vérifier l'état du service à tout moment.
 
 ---
 
@@ -111,7 +122,7 @@ L'endpoint [`/health`](https://parseandcutv2-production.up.railway.app/health) p
 
 **Meetup Killer** converts audio recordings of lectures or meetings into structured Markdown study notes.
 
-Originally built to run on a **Raspberry Pi**, it is now deployed on **Railway** via Docker. Heavy processing is offloaded to the **Groq API**:
+Built to run on a **Raspberry Pi**, it is deployed via **Docker** (backend container + frontend container [ParseAndCutPWA](../ParseAndCutPWA), orchestrated by `docker-compose.yml`), exposed publicly through a **Cloudflare Tunnel** — no port forwarding needed. Heavy processing is offloaded to the **Groq API**:
 
 - **Transcription**: Whisper Large V3 — maximum accuracy, multilingual
 - **Structuring**: Llama 3.3 (70B) — summary, headings, keywords, definition blocks
@@ -126,7 +137,7 @@ Originally built to run on a **Raspberry Pi**, it is now deployed on **Railway**
 | ✅ Robust validation | File type + size checked both client-side and server-side |
 | 🔁 Auto retry | Whisper retried on network timeout with exponential backoff |
 | 🐳 Docker ready | FFmpeg + Gunicorn pre-configured, lightweight `python:3.10-slim` image |
-| 📊 `/health` endpoint | Railway monitoring: Groq status, language, supported formats |
+| 📊 `/health` endpoint | Monitoring: Groq status, language, supported formats |
 
 ### Supported formats
 
@@ -166,13 +177,23 @@ Originally built to run on a **Raspberry Pi**, it is now deployed on **Railway**
 
    > On Raspberry Pi, replace `localhost` with your device's local IP address.
 
-### Deploy to Railway
+### Deployment (Docker + Raspberry Pi)
 
-1. Connect your GitHub repository to Railway
-2. Add `GROQ_API_KEY` in the service environment variables
-3. Railway auto-detects the `Dockerfile` and exposes the port via `$PORT`
+This is the production setup. This repo's `docker-compose.yml` runs the backend
+(internal network, port **5000**) and the [ParseAndCutPWA](../ParseAndCutPWA) frontend
+(nginx, port **8091**) — see [`DEPLOY_PI.md`](./DEPLOY_PI.md) for the full procedure
+(creating the `docker context` to the Pi, building, configuring the Cloudflare ingress).
 
-Check the [`/health`](https://parseandcutv2-production.up.railway.app/health) endpoint anytime to verify service status.
+```bash
+docker context use rpi
+docker compose up --build -d
+```
+
+Nginx (frontend container) serves the PWA static files and reverse-proxies `/api/` to
+the backend — same-origin, no CORS to manage. The Cloudflare Tunnel handles HTTPS and
+the `parseandcut.alithiel31.dev` domain name — no certificate to manage manually.
+
+Check the [`/health`](https://parseandcut.alithiel31.dev/api/health) endpoint anytime to verify service status.
 
 ---
 
@@ -180,8 +201,8 @@ Check the [`/health`](https://parseandcutv2-production.up.railway.app/health) en
 
 | Couche | Technologie |
 |---|---|
-| Backend | Flask + Gunicorn · Python 3.10 |
+| Backend | FastAPI + Uvicorn · Python 3.10 |
 | Audio | FFmpeg |
 | IA | Groq API — Whisper Large V3 + Llama 3.3 70B |
-| Frontend | HTML · CSS · JavaScript · marked.js |
-| Infra | Docker · Railway |
+| Frontend | [ParseAndCutPWA](../ParseAndCutPWA) — React + Vite (PWA) |
+| Infra | Docker · Raspberry Pi · Cloudflare Tunnel |
