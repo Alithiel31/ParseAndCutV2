@@ -5,6 +5,7 @@ import time
 import shutil
 from typing import Optional
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -27,6 +28,19 @@ if not os.getenv("RAILWAY_ENVIRONMENT"):
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+# --- CORS (pour le frontend PWA séparé, ex: ParseAndCutPWA) ---
+# CORS_ORIGINS : liste d'origines séparées par des virgules (ex: "https://monapp.netlify.app,http://localhost:5173")
+_cors_origins_env = os.getenv("CORS_ORIGINS", "*")
+CORS_ORIGINS = [o.strip() for o in _cors_origins_env.split(",")] if _cors_origins_env != "*" else ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 # Extensions audio autorisées
 ALLOWED_EXTENSIONS = {'mp3', 'mp4', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac', 'opus'}
@@ -210,6 +224,7 @@ def health():
 
 
 @app.post('/process')
+@app.post('/api/transcribe')  # alias explicite pour les clients API/PWA
 def process(audio: Optional[UploadFile] = File(None)):
 
     # --- Vérifications préalables ---

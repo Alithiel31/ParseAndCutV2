@@ -6,3 +6,9 @@ LANGUAGE=fr
 
 #Port
 PORT=5000
+
+# Origines autorisées pour le frontend PWA séparé (CORS), séparées par des virgules.
+# Pas nécessaire en prod si nginx sert le frontend ET reverse-proxy /api/* vers ce
+# backend sur le même domaine (parseandcut.alithiel31.dev) : c'est du same-origin.
+# Utile uniquement en dev local (Vite sur :5173 qui tape sur uvicorn sur :5000).
+CORS_ORIGINS=http://localhost:5173

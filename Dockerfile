@@ -9,6 +9,8 @@ RUN apt-get update \
 ENV PYTHONUNBUFFERED=1
 # Évite d'écrire des .pyc inutiles
 ENV PYTHONDONTWRITEBYTECODE=1
+# Port par défaut (Railway le surchargeait via $PORT ; utile en local/Pi sans plateforme externe)
+ENV PORT=5000
 
 WORKDIR /app
 
