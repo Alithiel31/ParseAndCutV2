@@ -1,7 +1,5 @@
-# Orchestration ParseAndCut : backend FastAPI (ce repo) + frontend PWA (repo séparé).
-# ⚠️ Les deux repos ne sont PAS dans le même dossier parent sur cette machine, donc
-# le contexte de build du frontend pointe vers un chemin absolu. Si tu déplaces le
-# repo ParseAndCutPWA, mets à jour le chemin ci-dessous.
+# Orchestration ParseAndCut : backend FastAPI (app/) + frontend PWA (frontend/),
+# monorepo unique — les deux services partagent ce même dossier.
 services:
   backend:
     build:
@@ -12,7 +10,7 @@ services:
 
   frontend:
     build:
-      context: C:/Users/jacqu/Documents/Claude/Projects/ParseAndCutPWA
+      context: ./frontend
     ports:
       - "8091:80"
     depends_on:

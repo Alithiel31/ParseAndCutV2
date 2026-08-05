@@ -1,0 +1,70 @@
+name: Build TWA Android App
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'twa-parseandcut/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      - name: Decode Keystore
+        run: |
+                echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d ' \n\r' | base64 --decode > twa-parseandcut/android.keystore
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Configure Bubblewrap
+        run: |
+          mkdir -p ~/.bubblewrap
+          echo "{\"jdkPath\":\"$JAVA_HOME\",\"androidSdkPath\":\"$ANDROID_SDK_ROOT\"}" > ~/.bubblewrap/config.json
+
+      - name: Set versionCode
+        run: |
+          VERSION_CODE=$(git rev-list --count HEAD)
+          sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" twa-parseandcut/app/build.gradle
+          echo "versionCode → $VERSION_CODE"
+
+      - name: Build AAB
+        working-directory: twa-parseandcut
+        env:
+          KSPASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KPASS: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          sudo apt-get install -y expect > /dev/null
+          chmod +x gradlew
+          expect -c '
+            set timeout -1
+            spawn bubblewrap build --skipPwaValidation
+            expect "Would you like to apply" { send "n\r" }
+            expect "Password for the Key Store" { send "$env(KSPASS)\r" }
+            expect -re {assword for the Key} { send "$env(KPASS)\r" }
+            expect eof
+          '
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: parseandcut-release
+          path: twa-parseandcut/app-release-bundle.aab
+          retention-days: 30

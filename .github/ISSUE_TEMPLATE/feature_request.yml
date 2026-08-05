@@ -41,8 +41,8 @@ body:
       label: What this touches
       multiple: true
       options:
-        - Backend (meetupKiller.py)
-        - Frontend (ParseAndCutPWA repo)
+        - Backend (app/)
+        - Frontend (frontend/)
         - Docker / deployment
         - CI workflows
         - Documentation
