@@ -9,6 +9,45 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 
 - Add a `LICENSE` file (the `MIT` license is already declared in `package.json` but not versioned as a file)
 
+## [1.0.0] - 2026-08-05
+
+Monorepo release: the backend is restructured into a layered (MVC-style) package, and the
+frontend PWA is merged into this repository. Breaking change on the deployment side (embedded
+UI route removed, entry point renamed) — no change to the public JSON API (`/health`,
+`/api/transcribe`, `/process`).
+
+### Added
+
+- `app/` package replacing the single-file `meetupKiller.py`: `config.py` (env vars, logging,
+  Groq client), `models/schemas.py` (Pydantic models), `services/` (`audio.py`,
+  `transcription.py`, `prompt.py`), `routers/` (`health.py`, `transcribe.py`), `main.py`
+  (FastAPI app + CORS + router wiring)
+- `frontend/` — the PWA (React + Vite + TWA scaffold), copied in from the former
+  `ParseAndCutPWA` repository so the whole project now lives in a single place
+- `docs/` folder grouping `CONTRIBUTING.md`/`.fr.md`, `Troubleshooting.md`/`.fr.md` and
+  `DEPLOY_PI.md`
+
+### Changed
+
+- Tests split to mirror the new backend structure: `tests/test_audio.py`,
+  `tests/test_prompt.py`, `tests/test_health.py`, `tests/test_transcribe.py`
+  (replacing `tests/test_meetupkiller.py`)
+- `Dockerfile` entry point: `uvicorn meetupKiller:app` → `uvicorn app.main:app`
+- `docker-compose.yml` frontend build context: absolute path to the external
+  `ParseAndCutPWA` repo → relative `./frontend`
+- `requirements.txt`: dropped `jinja2` (no more server-rendered templates)
+- CI workflows (`lint.yml`, `integration.yml`) updated for the new layout; JS/CSS linting
+  steps removed (no static assets left to lint in this repo)
+- `Troubleshooting.en.md` / `Troubleshooting.md` renamed to `Troubleshooting.md` /
+  `Troubleshooting.fr.md` to match the `.md` = English / `.fr.md` = French convention
+  already used by `README`/`CONTRIBUTING`
+- Documentation links updated across `README.md`/`.fr.md` and the GitHub issue templates
+
+### Removed
+
+- `meetupKiller.py`, `templates/`, `static/` — the legacy server-rendered UI and its routes
+  (`GET /`, `/static/*`); the PWA in `frontend/` is now the only frontend
+
 ## [0.5.0] - 2026-08-05
 
 Documentation release: no change to the application itself.
