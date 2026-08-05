@@ -5,9 +5,9 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 
 ## [Unreleased]
 
-### To do
+### Added
 
-- Add a `LICENSE` file (the `MIT` license is already declared in `package.json` but not versioned as a file)
+- `LICENSE` file (MIT, already declared in `package.json` but not versioned until now)
 
 ## [1.0.0] - 2026-08-05
 
