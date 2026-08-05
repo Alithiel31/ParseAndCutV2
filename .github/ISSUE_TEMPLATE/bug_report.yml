@@ -1,0 +1,87 @@
+name: Bug report
+description: Something is broken — transcription fails, the app won't start, the deployment is unreachable...
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this.
+
+        One incident is already documented in
+        [`Troubleshooting.en.md`](https://github.com/Alithiel31/ParseAndCutV2/blob/main/Troubleshooting.en.md)
+        ([version française](https://github.com/Alithiel31/ParseAndCutV2/blob/main/Troubleshooting.md)):
+        `GROQ_API_KEY` not being picked up correctly on the old Railway hosting. Worth a
+        look before filling this in.
+
+        ⚠️ **Never paste your real `GROQ_API_KEY`.** Redact it from any log or config you
+        copy here.
+
+        Issues in English or French are both fine.
+
+  - type: checkboxes
+    attributes:
+      label: Before reporting
+      options:
+        - label: I checked the troubleshooting notes and my problem is not already documented there
+          required: true
+        - label: I searched the existing issues
+          required: true
+        - label: I removed any secret (GROQ_API_KEY) from the logs and config below
+          required: true
+
+  - type: textarea
+    attributes:
+      label: What happens
+      description: What you observed, and what you expected instead.
+      placeholder: |
+        Uploading a 45-minute mp3 returns a 502 after about a minute. I expected a
+        structured Markdown note.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Steps to reproduce
+      description: What you ran, in order, starting from a known state.
+      placeholder: |
+        1. cp ".env exemple" .env, filled in GROQ_API_KEY
+        2. docker build -t meetup-killer . && docker run -d -p 5000:5000 --env-file .env meetup-killer
+        3. Uploaded a .mp3 file through the UI at localhost:5000
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Where this happens
+      options:
+        - Local (Docker)
+        - Local (python meetupKiller.py, no Docker)
+        - Production (Raspberry Pi / parseandcut.alithiel31.dev)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Backend logs
+      description: Output of `docker logs <container>` (prod/Docker) or the console output (local run).
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Audio file details
+      description: Format, approximate duration and size, if the issue is about transcription/processing.
+      placeholder: "mp3, 52 min, 48 MB"
+
+  - type: input
+    attributes:
+      label: /health response
+      description: Output of `curl http://localhost:5000/health` (or the production URL), if reachable.
+      placeholder: '{"status":"ok","groq_ready":true,"language":"fr",...}'
+
+  - type: textarea
+    attributes:
+      label: Anything else
+      description: Docker/Python versions, host (Raspberry Pi model, OS), changes made to docker-compose.yml or .env, etc.

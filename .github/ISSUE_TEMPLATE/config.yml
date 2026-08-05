@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Troubleshooting notes (English)
+    url: https://github.com/Alithiel31/ParseAndCutV2/blob/main/Troubleshooting.en.md
+    about: The GROQ_API_KEY loading issue on Railway is documented here, with the diagnostic process.
+  - name: Notes de troubleshooting (français)
+    url: https://github.com/Alithiel31/ParseAndCutV2/blob/main/Troubleshooting.md
+    about: L'incident déjà rencontré (clé GROQ_API_KEY sur Railway), avec la démarche de diagnostic.
+  - name: Contributing guide
+    url: https://github.com/Alithiel31/ParseAndCutV2/blob/main/CONTRIBUTING.md
+    about: Development environment, how to reproduce the CI checks locally, and the pull request / release format.
+  - name: Live service
+    url: https://parseandcut.alithiel31.dev
+    about: Try the deployed app directly before reporting a bug.

@@ -1,133 +1,48 @@
-# 🎓 Meetup Killer — Assistant de Cours IA
+# 🎓 Meetup Killer — AI Course Assistant
 
+🇫🇷 [Version française](./README.fr.md)
+
+[![CI Lint](https://github.com/Alithiel31/ParseAndCutV2/actions/workflows/lint.yml/badge.svg)](https://github.com/Alithiel31/ParseAndCutV2/actions/workflows/lint.yml)
+[![CI Integration](https://github.com/Alithiel31/ParseAndCutV2/actions/workflows/integration.yml/badge.svg)](https://github.com/Alithiel31/ParseAndCutV2/actions/workflows/integration.yml)
 [![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-blue?logo=docker)](https://www.docker.com/)
 [![Groq](https://img.shields.io/badge/Powered%20by-Groq-orange)](https://groq.com/)
-[![Déployé](https://img.shields.io/badge/Déployé-parseandcut.alithiel31.dev-blue)](https://parseandcut.alithiel31.dev)
+[![Live](https://img.shields.io/badge/Live-parseandcut.alithiel31.dev-blue)](https://parseandcut.alithiel31.dev)
 [![Cloudflare](https://img.shields.io/badge/Tunnel-Cloudflare-orange?logo=cloudflare)](https://www.cloudflare.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> 🚀 **Service en ligne** : [parseandcut.alithiel31.dev](https://parseandcut.alithiel31.dev)
+> 🚀 **Live service**: [parseandcut.alithiel31.dev](https://parseandcut.alithiel31.dev)
 
----
+**Meetup Killer** turns audio recordings of lectures or meetings into structured Markdown study notes. Built to run on a **Raspberry Pi**, deployed via **Docker**, exposed publicly through a **Cloudflare Tunnel** — no port forwarding. Heavy processing is offloaded to the **Groq API** (Whisper Large V3 for transcription, Llama 3.3 70B for structuring).
 
-## 🇫🇷 Français
+## Table of contents
 
-### À propos
+- [Stack & skills](#stack--skills)
+- [Features](#features)
+- [Supported audio formats](#supported-audio-formats)
+- [Architecture](#architecture)
+- [Environment variables](#environment-variables)
+- [Local setup](#local-setup)
+- [Deployment (Docker + Raspberry Pi)](#deployment-docker--raspberry-pi)
+- [Testing & CI](#testing--ci)
+- [Releases & versioning](#releases--versioning)
+- [Contributing](#contributing)
+- [License](#license)
 
-**Meetup Killer** transforme vos enregistrements audio de cours ou de réunions en fiches de révision structurées au format Markdown.
+## Stack & skills
 
-Conçu pour tourner sur **Raspberry Pi**, il est déployé via **Docker** (conteneur backend + conteneur frontend [ParseAndCutPWA](../ParseAndCutPWA), orchestrés par `docker-compose.yml`), exposé publiquement via un **tunnel Cloudflare** — aucun port ouvert sur le routeur. Le traitement lourd est délégué à l'API **Groq** pour des performances maximales :
+This project covers, end to end:
 
-- **Transcription** : Whisper Large V3 — précision maximale, multilingue
-- **Structuration** : Llama 3.3 (70B) — résumé, titres, définitions en Markdown
+- **Backend**: FastAPI + Uvicorn (Python 3.10), migrated from an original Flask implementation
+- **Audio processing**: FFmpeg (chunking long recordings for the Groq 25 MB per-file limit)
+- **AI**: Groq API — Whisper Large V3 (transcription) + Llama 3.3 70B (structuring)
+- **Frontend**: [ParseAndCutPWA](../ParseAndCutPWA) — React + Vite Progressive Web App, packaged as a TWA (Trusted Web Activity) for Android
+- **Containerization & deployment**: Docker Compose (backend + frontend containers), Raspberry Pi target via a `docker context`, Cloudflare Tunnel for HTTPS/public access with no port forwarding — see [`DEPLOY_PI.md`](./DEPLOY_PI.md)
+- **CI/CD**: GitHub Actions — linting (flake8, ESLint, Stylelint) and integration tests (FastAPI app boot, `/health`, `/process` error paths) on every push/PR
+- **Operational history**: migrated the hosting platform from Railway to a self-hosted Docker/Pi setup — see [`Troubleshooting.en.md`](./Troubleshooting.en.md)
+- **Documentation**: versioned changelog ([Keep a Changelog](https://keepachangelog.com/en/1.0.0/)), tagged releases (SemVer)
 
-### Fonctionnalités
-
-| Fonctionnalité | Détail |
-|---|---|
-| 🎙️ Transcription longue durée | Découpage automatique en chunks de 10 min — **supporte les audios > 1h** |
-| 🧠 Fiche structurée | Résumé, titres hiérarchiques, mots-clés en gras, blocs définition |
-| 🌐 Interface moderne | Drag & drop, barre de progression par étape, affichage des stats |
-| ✅ Validation robuste | Vérification type + taille côté client ET serveur |
-| 🔁 Retry automatique | Relance Whisper en cas de timeout réseau (backoff exponentiel) |
-| 🐳 Docker ready | FFmpeg + Gunicorn pré-configurés, image légère `python:3.10-slim` |
-| 📊 Endpoint `/health` | Monitoring : état Groq, langue, extensions supportées |
-
-### Formats audio supportés
-
-`mp3` · `mp4` · `wav` · `m4a` · `ogg` · `webm` · `flac` · `aac` · `opus`
-
-### Architecture
-```
-Audio (upload)
-    │
-    ▼
-[Validation] → type, taille, extension
-    │
-    ▼
-[FFmpeg] → découpage en chunks de 10 min
-    │
-    ▼
-[Groq Whisper Large V3] → transcription chunk par chunk
-    │
-    ▼
-[Groq Llama 3.3 70B] → structuration Markdown
-    │
-    ▼
-Fiche de révision ✅
-```
-
-### Variables d'environnement
-
-| Variable | Obligatoire | Défaut | Description |
-|---|---|---|---|
-| `GROQ_API_KEY` | ✅ | — | Clé API Groq |
-| `LANGUAGE` | ❌ | `fr` | Langue de transcription Whisper |
-| `CHUNK_DURATION_SEC` | ❌ | `600` | Durée des chunks en secondes |
-| `FFMPEG_PATH` | ❌ | `ffmpeg` | Chemin vers le binaire FFmpeg |
-| `FLASK_DEBUG` | ❌ | `false` | Mode debug (dev uniquement) |
-
-### Installation locale
-
-1. **Cloner le dépôt**
-```bash
-   git clone https://github.com/Alithiel31/meetup-killer.git
-   cd meetup-killer
-```
-
-2. **Configurer le `.env`**
-```env
-   GROQ_API_KEY=votre_cle_api
-   LANGUAGE=fr
-   # Optionnel :
-   # CHUNK_DURATION_SEC=600
-```
-
-3. **Lancer avec Docker**
-```bash
-   docker build -t meetup-killer .
-   docker run -d -p 8080:8080 --name meetup-app --env-file .env meetup-killer
-```
-
-4. **Accéder à l'outil**
-
-   Ouvrez [http://localhost:8080](http://localhost:8080)
-
-   > Sur Raspberry Pi, remplacez `localhost` par l'IP locale de votre machine.
-
-### Déploiement (Docker + Raspberry Pi)
-
-C'est la méthode utilisée en production. Le `docker-compose.yml` de ce dépôt lance le
-backend (réseau interne, port **5000**) et le frontend [ParseAndCutPWA](../ParseAndCutPWA)
-(nginx, port **8091**) — voir [`DEPLOY_PI.md`](./DEPLOY_PI.md) pour la procédure complète
-(création du `docker context` vers le Pi, build, configuration de l'ingress Cloudflare).
-
-```bash
-docker context use rpi
-docker compose up --build -d
-```
-
-Nginx (conteneur frontend) sert les fichiers statiques du PWA et reverse-proxy `/api/`
-vers le backend — same-origin, pas de CORS à gérer. Le tunnel Cloudflare gère le HTTPS
-et le nom de domaine `parseandcut.alithiel31.dev` — aucun certificat à gérer manuellement.
-
-L'endpoint [`/health`](https://parseandcut.alithiel31.dev/api/health) permet de vérifier l'état du service à tout moment.
-
----
-
-## 🇬🇧 English
-
-### About
-
-**Meetup Killer** converts audio recordings of lectures or meetings into structured Markdown study notes.
-
-Built to run on a **Raspberry Pi**, it is deployed via **Docker** (backend container + frontend container [ParseAndCutPWA](../ParseAndCutPWA), orchestrated by `docker-compose.yml`), exposed publicly through a **Cloudflare Tunnel** — no port forwarding needed. Heavy processing is offloaded to the **Groq API**:
-
-- **Transcription**: Whisper Large V3 — maximum accuracy, multilingual
-- **Structuring**: Llama 3.3 (70B) — summary, headings, keywords, definition blocks
-
-### Features
+## Features
 
 | Feature | Detail |
 |---|---|
@@ -136,73 +51,123 @@ Built to run on a **Raspberry Pi**, it is deployed via **Docker** (backend conta
 | 🌐 Modern UI | Drag & drop, step-by-step progress bar, processing stats |
 | ✅ Robust validation | File type + size checked both client-side and server-side |
 | 🔁 Auto retry | Whisper retried on network timeout with exponential backoff |
-| 🐳 Docker ready | FFmpeg + Gunicorn pre-configured, lightweight `python:3.10-slim` image |
+| 🐳 Docker ready | FFmpeg + Uvicorn pre-configured, lightweight `python:3.10-slim` image |
 | 📊 `/health` endpoint | Monitoring: Groq status, language, supported formats |
 
-### Supported formats
+## Supported audio formats
 
 `mp3` · `mp4` · `wav` · `m4a` · `ogg` · `webm` · `flac` · `aac` · `opus`
 
-### Environment variables
+## Architecture
+
+```mermaid
+flowchart LR
+    U["User (browser / TWA)"] -->|upload audio| FE
+
+    subgraph Pi["Raspberry Pi (Docker Compose)"]
+        FE["frontend container<br/>nginx · ParseAndCutPWA<br/>:8091"]
+        BE["backend container<br/>FastAPI + Uvicorn<br/>:5000 (internal only)"]
+        FE -->|reverse-proxy /api/*| BE
+    end
+
+    BE -->|FFmpeg| CHUNK["10-min chunks"]
+    CHUNK -->|Whisper Large V3| TXT["raw transcription"]
+    TXT -->|Llama 3.3 70B| MD["structured Markdown"]
+
+    TUN["Cloudflare Tunnel<br/>parseandcut.alithiel31.dev"] --> FE
+    U -.->|public access| TUN
+```
+
+Nginx (frontend container) serves the PWA static files and reverse-proxies `/api/` to the backend — same-origin, no CORS to manage in production. The Cloudflare Tunnel handles HTTPS and the domain name — no certificate to manage manually, no port opened on the router.
+
+## Environment variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `GROQ_API_KEY` | ✅ | — | Groq API key |
+| `GROQ_API_KEY` | ✅ | — | Groq API key ([console.groq.com](https://console.groq.com/)) |
 | `LANGUAGE` | ❌ | `fr` | Whisper transcription language |
+| `PORT` | ❌ | `5000` | Port the backend listens on |
 | `CHUNK_DURATION_SEC` | ❌ | `600` | Chunk duration in seconds |
-| `FFMPEG_PATH` | ❌ | `ffmpeg` | Path to FFmpeg binary |
+| `FFMPEG_PATH` | ❌ | `ffmpeg` | Path to the FFmpeg binary |
+| `CORS_ORIGINS` | ❌ | `*` | Comma-separated allowed origins — only needed in local dev (Vite on `:5173` calling Uvicorn on `:5000`); not needed in prod since nginx serves same-origin |
 | `FLASK_DEBUG` | ❌ | `false` | Debug mode (dev only) |
 
-### Local setup
+## Local setup
 
 1. **Clone the repository**
-```bash
-   git clone https://github.com/Alithiel31/meetup-killer.git
-   cd meetup-killer
-```
+
+   ```bash
+   git clone https://github.com/Alithiel31/ParseAndCutV2.git
+   cd ParseAndCutV2
+   ```
 
 2. **Create your `.env` file**
-```env
-   GROQ_API_KEY=your_api_key
-   LANGUAGE=fr
-```
+
+   ```bash
+   cp ".env exemple" .env
+   ```
+
+   Fill in `GROQ_API_KEY` at minimum.
 
 3. **Run with Docker**
-```bash
+
+   ```bash
    docker build -t meetup-killer .
-   docker run -d -p 8080:8080 --name meetup-app --env-file .env meetup-killer
-```
+   docker run -d -p 5000:5000 --name meetup-app --env-file .env meetup-killer
+   ```
 
-4. **Open the app** at [http://localhost:8080](http://localhost:8080)
+   Or without Docker (Python 3.10 + FFmpeg installed locally):
 
-   > On Raspberry Pi, replace `localhost` with your device's local IP address.
+   ```bash
+   pip install -r requirements.txt
+   python meetupKiller.py
+   ```
 
-### Deployment (Docker + Raspberry Pi)
+4. **Open the app** at [http://localhost:5000](http://localhost:5000)
 
-This is the production setup. This repo's `docker-compose.yml` runs the backend
-(internal network, port **5000**) and the [ParseAndCutPWA](../ParseAndCutPWA) frontend
-(nginx, port **8091**) — see [`DEPLOY_PI.md`](./DEPLOY_PI.md) for the full procedure
-(creating the `docker context` to the Pi, building, configuring the Cloudflare ingress).
+   > On Raspberry Pi, replace `localhost` with the device's local IP address.
+
+## Deployment (Docker + Raspberry Pi)
+
+This is the production setup. This repo's `docker-compose.yml` runs the backend (internal network, port **5000**) and the [ParseAndCutPWA](../ParseAndCutPWA) frontend (nginx, port **8091**) — see [`DEPLOY_PI.md`](./DEPLOY_PI.md) for the full procedure (creating the `docker context` to the Pi, building, configuring the Cloudflare ingress).
 
 ```bash
 docker context use rpi
 docker compose up --build -d
 ```
 
-Nginx (frontend container) serves the PWA static files and reverse-proxies `/api/` to
-the backend — same-origin, no CORS to manage. The Cloudflare Tunnel handles HTTPS and
-the `parseandcut.alithiel31.dev` domain name — no certificate to manage manually.
-
 Check the [`/health`](https://parseandcut.alithiel31.dev/api/health) endpoint anytime to verify service status.
 
----
+## Testing & CI
 
-## Stack
+```bash
+# Linting (Python, JS, CSS) — same checks as the lint.yml workflow
+npm run lint
 
-| Couche | Technologie |
-|---|---|
-| Backend | FastAPI + Uvicorn · Python 3.10 |
-| Audio | FFmpeg |
-| IA | Groq API — Whisper Large V3 + Llama 3.3 70B |
-| Frontend | [ParseAndCutPWA](../ParseAndCutPWA) — React + Vite (PWA) |
-| Infra | Docker · Raspberry Pi · Cloudflare Tunnel |
+# Unit tests (FastAPI routes mocked against FFmpeg/Groq)
+pytest
+```
+
+Two workflows run on every push/PR to `main`:
+
+- **CI Lint** (`.github/workflows/lint.yml`): flake8, ESLint, Stylelint
+- **CI Integration** (`.github/workflows/integration.yml`): boots the FastAPI app and checks `/`, `/health`, and the `/process` error paths (missing file → 400, unsupported format → 415)
+
+## Releases & versioning
+
+This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`) and [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Every notable change lands in [`CHANGELOG.md`](./CHANGELOG.md) under `[Unreleased]` first, then under a version heading once tagged:
+
+```bash
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+A GitHub Release is then created from the tag, with its description copied from the matching `CHANGELOG.md` section.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the development environment, how to reproduce the CI checks locally, and the PR/release format.
+
+## License
+
+MIT (see `license` field in [`package.json`](./package.json)).

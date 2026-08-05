@@ -1,0 +1,57 @@
+name: Change or improvement
+description: Suggest a change to the backend, the deployment or the documentation
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The contributing guide asks you to open an issue before sending a pull request
+        for anything beyond a trivial fix — this is that issue.
+
+        Check the "To do" items in
+        [`CHANGELOG.md`](https://github.com/Alithiel31/ParseAndCutV2/blob/main/CHANGELOG.md#unreleased)
+        first: what you have in mind may already be planned.
+
+        Issues in English or French are both fine.
+
+  - type: textarea
+    attributes:
+      label: What problem does this solve
+      description: The situation you ran into, not the solution yet.
+      placeholder: |
+        Very long recordings (> 2h) time out during transcription because chunks are
+        processed sequentially with no progress feedback to the user.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: What you suggest
+      description: The change you have in mind, as concretely as you can put it.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Alternatives you considered
+      description: Other ways of solving it, and why you set them aside.
+
+  - type: dropdown
+    attributes:
+      label: What this touches
+      multiple: true
+      options:
+        - Backend (meetupKiller.py)
+        - Frontend (ParseAndCutPWA repo)
+        - Docker / deployment
+        - CI workflows
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to open the pull request myself
