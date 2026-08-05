@@ -1,0 +1,35 @@
+# Contexte de build du service backend (Dockerfile racine) : seuls app/,
+# requirements.txt et .env sont nécessaires. Tout le reste alourdit inutilement
+# le transfert de contexte vers le démon Docker (notable sur Docker Desktop/WSL2
+# ou un docker context distant type Raspberry Pi).
+
+.git
+.github
+
+# Frontend : géré par son propre Dockerfile/contexte (./frontend), pas utile ici
+frontend
+frontend/node_modules
+
+# Node (devDependencies eslint/stylelint à la racine, non utilisées en prod)
+node_modules
+
+# Python
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+
+# Tests / docs / config dev (pas nécessaires à l'exécution de l'app)
+tests
+docs
+*.md
+.flake8
+.pre-commit-config.yaml
+.stylelintrc.json
+eslint.config.mjs
+.vscode
+.idea
+
+# Secrets
+.env
+.env.local

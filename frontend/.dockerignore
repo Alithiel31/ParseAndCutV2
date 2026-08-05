@@ -1,0 +1,9 @@
+node_modules
+dist
+dev-dist
+.git
+.github
+twa-parseandcut
+*.md
+.env
+.env.local
