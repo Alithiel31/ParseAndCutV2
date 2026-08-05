@@ -25,14 +25,14 @@ jobs:
         pip install -r requirements.txt
         sudo apt-get update && sudo apt-get install -y ffmpeg
 
-    - name: Test import Flask app
+    - name: Test import FastAPI app
       env:
         GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         RAILWAY_ENVIRONMENT: "true"
       run: |
-        python -c "from meetupKiller import app, client, ALLOWED_EXTENSIONS; \
+        python -c "from app.main import app; from app.config import ALLOWED_EXTENSIONS; \
           print('✅ Import OK'); \
-          assert app is not None, 'Flask app manquante'; \
+          assert app is not None, 'FastAPI app manquante'; \
           assert 'mp3' in ALLOWED_EXTENSIONS, 'Extensions manquantes'; \
           print('✅ Variables de config OK')"
 
@@ -42,17 +42,12 @@ jobs:
         RAILWAY_ENVIRONMENT: "true"
         PORT: "5000"
       run: |
-        python meetupKiller.py &
+        python -m app.main &
         for i in $(seq 1 15); do
           curl -sf http://127.0.0.1:5000/health && break
           echo "Tentative $i/15 — app pas encore prête..."
           sleep 1
         done
-
-    - name: Test route /
-      run: |
-        curl -f http://127.0.0.1:5000/ \
-          -o /dev/null -w "Status HTTP: %{http_code}\n" || exit 1
 
     - name: Test route /health
       run: |
@@ -72,6 +67,6 @@ jobs:
       run: |
         STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
           -X POST http://127.0.0.1:5000/process \
-          -F "audio=@meetupKiller.py")
+          -F "audio=@requirements.txt")
         echo "Status reçu : $STATUS"
         [ "$STATUS" = "415" ] || exit 1

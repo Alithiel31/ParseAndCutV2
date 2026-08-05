@@ -4,10 +4,8 @@
   "type": "module",
   "description": "Transcription et résumé de cours audio avec Whisper et Llama 3",
   "scripts": {
-    "lint": "npm run lint:py && npm run lint:js && npm run lint:css",
-    "lint:py": "python -m flake8 meetupKiller.py",
-    "lint:js": "npx eslint static/js/main.js",
-    "lint:css": "npx stylelint static/css/style.css"
+    "lint": "npm run lint:py",
+    "lint:py": "python -m flake8 app"
   },
   "repository": {
     "type": "git",

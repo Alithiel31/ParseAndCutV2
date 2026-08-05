@@ -20,4 +20,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Uvicorn sert l'application ASGI FastAPI (remplace Gunicorn+Flask)
-CMD uvicorn meetupKiller:app --host 0.0.0.0 --port $PORT --workers 2
+CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2
