@@ -26,6 +26,9 @@ UI route removed, entry point renamed) — no change to the public JSON API (`/h
   `ParseAndCutPWA` repository so the whole project now lives in a single place
 - `docs/` folder grouping `CONTRIBUTING.md`/`.fr.md`, `Troubleshooting.md`/`.fr.md` and
   `DEPLOY_PI.md`
+- `.dockerignore` (root and `frontend/`): excludes `.git`, `node_modules`, `frontend/`
+  (from the backend context) and dev-only files, fixing a very slow `docker compose build`
+  caused by the backend context otherwise including the whole `frontend/node_modules` tree
 
 ### Changed
 
