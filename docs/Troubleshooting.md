@@ -1,6 +1,6 @@
 # Troubleshooting
 
-🇫🇷 [Version française](./Troubleshooting.md)
+🇫🇷 [Version française](./Troubleshooting.fr.md)
 
 This document goes back over a real incident hit during the project's first hosting setup (Railway), reconstructed from the git history (`c37f8ba`, `db7cfa6`, `bdd1e6d`). The commit messages from that time are terse; what follows describes what is confirmed by the code diff versus what remains a hypothesis.
 

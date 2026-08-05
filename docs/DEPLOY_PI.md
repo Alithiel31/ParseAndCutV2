@@ -24,8 +24,8 @@ Depuis ce dossier (`ParseAndCutV2`), avec le context `rpi` actif :
 docker compose up --build -d
 ```
 
-Docker envoie le contexte de build (fichiers locaux des deux repos) au démon distant
-du Pi — pas besoin de cloner quoi que ce soit sur le Pi. Le frontend sera exposé sur
+Docker envoie le contexte de build (fichiers locaux de `app/` et `frontend/`) au démon
+distant du Pi — pas besoin de cloner quoi que ce soit sur le Pi. Le frontend sera exposé sur
 le port **8091** du Pi (`http://<ip-du-pi>:8091`), le backend n'est joignable qu'en
 interne via le réseau Docker (`backend:5000`).
 

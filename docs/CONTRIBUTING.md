@@ -26,17 +26,15 @@ FFmpeg must be installed locally (`ffmpeg -version`) to run the app outside Dock
 ## Reproducing the CI checks locally
 
 ```bash
-# Linting (Python, JS, CSS) — same as .github/workflows/lint.yml
+# Linting (Python) — same as .github/workflows/lint.yml
 npm run lint
-npm run lint:py    # flake8 meetupKiller.py
-npm run lint:js    # eslint static/js/main.js
-npm run lint:css   # stylelint static/css/style.css
+npm run lint:py    # flake8 app
 
 # Unit tests
 pytest
 
 # Integration checks — same steps as .github/workflows/integration.yml
-python meetupKiller.py &
+python -m app.main &
 curl -sf http://127.0.0.1:5000/health
 ```
 
@@ -67,7 +65,7 @@ Version bump guide: **MAJOR** for a breaking API/config change (env var renamed,
 
 ## Reporting a problem
 
-Check [`Troubleshooting.en.md`](./Troubleshooting.en.md) before opening an issue — known incidents (Railway env var loading, Docker/Pi migration) may already cover it. Never paste a real `GROQ_API_KEY` in an issue; redact it from any log or config you copy in.
+Check [`Troubleshooting.md`](./Troubleshooting.md) before opening an issue — known incidents (Railway env var loading, Docker/Pi migration) may already cover it. Never paste a real `GROQ_API_KEY` in an issue; redact it from any log or config you copy in.
 
 ## Secrets
 

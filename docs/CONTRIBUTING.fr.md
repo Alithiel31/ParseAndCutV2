@@ -26,17 +26,15 @@ FFmpeg doit être installé localement (`ffmpeg -version`) pour lancer l'app hor
 ## Reproduire les vérifications de la CI en local
 
 ```bash
-# Lint (Python, JS, CSS) — identique à .github/workflows/lint.yml
+# Lint (Python) — identique à .github/workflows/lint.yml
 npm run lint
-npm run lint:py    # flake8 meetupKiller.py
-npm run lint:js    # eslint static/js/main.js
-npm run lint:css   # stylelint static/css/style.css
+npm run lint:py    # flake8 app
 
 # Tests unitaires
 pytest
 
 # Vérifications d'intégration — mêmes étapes que .github/workflows/integration.yml
-python meetupKiller.py &
+python -m app.main &
 curl -sf http://127.0.0.1:5000/health
 ```
 
@@ -67,7 +65,7 @@ Guide de bump de version : **MAJOR** pour un changement cassant (variable d'env 
 
 ## Signaler un problème
 
-Voir [`Troubleshooting.md`](./Troubleshooting.md) avant d'ouvrir une issue — les incidents connus (chargement de variable d'env sur Railway, migration Docker/Pi) couvrent peut-être déjà le cas. Ne jamais coller de vraie valeur de `GROQ_API_KEY` dans une issue ; la masquer dans tout log ou config recopié.
+Voir [`Troubleshooting.fr.md`](./Troubleshooting.fr.md) avant d'ouvrir une issue — les incidents connus (chargement de variable d'env sur Railway, migration Docker/Pi) couvrent peut-être déjà le cas. Ne jamais coller de vraie valeur de `GROQ_API_KEY` dans une issue ; la masquer dans tout log ou config recopié.
 
 ## Secrets
 

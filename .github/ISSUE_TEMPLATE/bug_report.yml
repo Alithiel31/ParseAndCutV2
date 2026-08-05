@@ -8,8 +8,8 @@ body:
         Thanks for taking the time to report this.
 
         One incident is already documented in
-        [`Troubleshooting.en.md`](https://github.com/Alithiel31/ParseAndCutV2/blob/main/Troubleshooting.en.md)
-        ([version française](https://github.com/Alithiel31/ParseAndCutV2/blob/main/Troubleshooting.md)):
+        [`docs/Troubleshooting.md`](https://github.com/Alithiel31/ParseAndCutV2/blob/main/docs/Troubleshooting.md)
+        ([version française](https://github.com/Alithiel31/ParseAndCutV2/blob/main/docs/Troubleshooting.fr.md)):
         `GROQ_API_KEY` not being picked up correctly on the old Railway hosting. Worth a
         look before filling this in.
 
@@ -55,7 +55,7 @@ body:
       label: Where this happens
       options:
         - Local (Docker)
-        - Local (python meetupKiller.py, no Docker)
+        - Local (python -m app.main, no Docker)
         - Production (Raspberry Pi / parseandcut.alithiel31.dev)
         - Not sure
     validations:

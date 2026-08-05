@@ -1,6 +1,6 @@
 # Troubleshooting
 
-🇬🇧 [English version](./Troubleshooting.en.md)
+🇬🇧 [English version](./Troubleshooting.md)
 
 Ce document retrace un incident réel rencontré lors du premier hébergement du projet (Railway), reconstitué à partir de l'historique git (`c37f8ba`, `db7cfa6`, `bdd1e6d`). Les messages de commit de l'époque sont courts ; ce qui suit décrit ce qui est confirmé par le diff du code et ce qui reste une hypothèse.
 

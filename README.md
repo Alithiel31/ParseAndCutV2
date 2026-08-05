@@ -36,10 +36,10 @@ This project covers, end to end:
 - **Backend**: FastAPI + Uvicorn (Python 3.10), migrated from an original Flask implementation
 - **Audio processing**: FFmpeg (chunking long recordings for the Groq 25 MB per-file limit)
 - **AI**: Groq API — Whisper Large V3 (transcription) + Llama 3.3 70B (structuring)
-- **Frontend**: [ParseAndCutPWA](../ParseAndCutPWA) — React + Vite Progressive Web App, packaged as a TWA (Trusted Web Activity) for Android
-- **Containerization & deployment**: Docker Compose (backend + frontend containers), Raspberry Pi target via a `docker context`, Cloudflare Tunnel for HTTPS/public access with no port forwarding — see [`DEPLOY_PI.md`](./DEPLOY_PI.md)
+- **Frontend**: [`frontend/`](./frontend) — React + Vite Progressive Web App, packaged as a TWA (Trusted Web Activity) for Android
+- **Containerization & deployment**: Docker Compose (backend + frontend containers), Raspberry Pi target via a `docker context`, Cloudflare Tunnel for HTTPS/public access with no port forwarding — see [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md)
 - **CI/CD**: GitHub Actions — linting (flake8, ESLint, Stylelint) and integration tests (FastAPI app boot, `/health`, `/process` error paths) on every push/PR
-- **Operational history**: migrated the hosting platform from Railway to a self-hosted Docker/Pi setup — see [`Troubleshooting.en.md`](./Troubleshooting.en.md)
+- **Operational history**: migrated the hosting platform from Railway to a self-hosted Docker/Pi setup — see [`docs/Troubleshooting.md`](./docs/Troubleshooting.md)
 - **Documentation**: versioned changelog ([Keep a Changelog](https://keepachangelog.com/en/1.0.0/)), tagged releases (SemVer)
 
 ## Features
@@ -65,7 +65,7 @@ flowchart LR
     U["User (browser / TWA)"] -->|upload audio| FE
 
     subgraph Pi["Raspberry Pi (Docker Compose)"]
-        FE["frontend container<br/>nginx · ParseAndCutPWA<br/>:8091"]
+        FE["frontend container<br/>nginx · frontend/<br/>:8091"]
         BE["backend container<br/>FastAPI + Uvicorn<br/>:5000 (internal only)"]
         FE -->|reverse-proxy /api/*| BE
     end
@@ -120,7 +120,7 @@ Nginx (frontend container) serves the PWA static files and reverse-proxies `/api
 
    ```bash
    pip install -r requirements.txt
-   python meetupKiller.py
+   python -m app.main
    ```
 
 4. **Open the app** at [http://localhost:5000](http://localhost:5000)
@@ -129,7 +129,7 @@ Nginx (frontend container) serves the PWA static files and reverse-proxies `/api
 
 ## Deployment (Docker + Raspberry Pi)
 
-This is the production setup. This repo's `docker-compose.yml` runs the backend (internal network, port **5000**) and the [ParseAndCutPWA](../ParseAndCutPWA) frontend (nginx, port **8091**) — see [`DEPLOY_PI.md`](./DEPLOY_PI.md) for the full procedure (creating the `docker context` to the Pi, building, configuring the Cloudflare ingress).
+This is the production setup. This repo's `docker-compose.yml` runs the backend (internal network, port **5000**) and the [`frontend/`](./frontend) PWA (nginx, port **8091**) — see [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md) for the full procedure (creating the `docker context` to the Pi, building, configuring the Cloudflare ingress).
 
 ```bash
 docker context use rpi
@@ -166,7 +166,7 @@ A GitHub Release is then created from the tag, with its description copied from 
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the development environment, how to reproduce the CI checks locally, and the PR/release format.
+See [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) for the development environment, how to reproduce the CI checks locally, and the PR/release format.
 
 ## License
 
