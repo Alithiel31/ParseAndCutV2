@@ -12,7 +12,14 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dev-dist
 *.local
+
+# Python
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
 
 # Env
 .env
