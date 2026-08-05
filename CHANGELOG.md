@@ -8,8 +8,18 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 ### To do
 
 - Add a `LICENSE` file (the `MIT` license is already declared in `package.json` but not versioned as a file)
-- Tag the releases below retroactively (`v0.1.0` … `v0.4.0`) so GitHub Releases match this changelog
-- Add English/French bilingual `README.md` review pass now that the format has changed from inline sections to separate files
+
+## [0.5.0] - 2026-08-05
+
+Documentation release: no change to the application itself.
+
+### Added
+
+- Bilingual `README.md` (English, main) / `README.fr.md` (French), replacing the previous single file with inline FR/EN sections — table of contents, architecture diagram, stack & skills section
+- `CONTRIBUTING.md` / `CONTRIBUTING.fr.md`: dev environment, how to reproduce CI checks locally, PR format, and the release/tagging procedure below
+- `CHANGELOG.md`, reconstructed from the git history (Flask → FastAPI migration, Railway → Docker/Pi migration)
+- `Troubleshooting.md` / `Troubleshooting.en.md`: the `GROQ_API_KEY` loading issue on Railway, reconstructed from the `c37f8ba`/`db7cfa6` commits
+- GitHub issue forms (`.github/ISSUE_TEMPLATE/`): bug report, change/improvement request, and links to the troubleshooting notes
 
 ## [0.4.0] - 2026-07-14
 
