@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 import type { TranscribeStats } from "../api";
 
 interface ResultViewProps {
@@ -9,7 +10,17 @@ interface ResultViewProps {
 
 export default function ResultView({ markdown, stats }: ResultViewProps) {
   const [copied, setCopied] = useState(false);
-  const html = marked.parse(markdown, { async: false }) as string;
+
+  // Le Markdown vient du LLM, donc indirectement de l'audio déposé : `marked` ne filtre
+  // pas le HTML brut, il faut l'assainir avant de l'injecter. Le profil `html` écarte
+  // SVG et MathML, qu'une fiche de révision ne contient jamais.
+  const html = useMemo(
+    () =>
+      DOMPurify.sanitize(marked.parse(markdown, { async: false }) as string, {
+        USE_PROFILES: { html: true },
+      }),
+    [markdown]
+  );
 
   function handleCopy() {
     // Copie le texte brut rendu (sans balises HTML)

@@ -53,6 +53,7 @@ Ce projet couvre, de bout en bout :
 | 🔁 Retry automatique | Relance Whisper en cas de timeout réseau (backoff exponentiel) |
 | 🐳 Docker ready | FFmpeg + Uvicorn pré-configurés, image légère `python:3.10-slim` |
 | 📊 Endpoint `/health` | Monitoring : état Groq, langue, extensions supportées |
+| ⚖️ Pages légales | CGU, politique de confidentialité et mentions légales servies par le PWA (`/cgu`, `/politique-de-confidentialite`, `/mentions-legales`) |
 
 ## Formats audio supportés
 

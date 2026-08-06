@@ -53,6 +53,7 @@ This project covers, end to end:
 | 🔁 Auto retry | Whisper retried on network timeout with exponential backoff |
 | 🐳 Docker ready | FFmpeg + Uvicorn pre-configured, lightweight `python:3.10-slim` image |
 | 📊 `/health` endpoint | Monitoring: Groq status, language, supported formats |
+| ⚖️ Legal pages | Terms, privacy policy and legal notice served by the PWA (`/cgu`, `/politique-de-confidentialite`, `/mentions-legales`) |
 
 ## Supported audio formats
 

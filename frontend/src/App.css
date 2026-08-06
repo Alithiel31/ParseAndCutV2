@@ -28,12 +28,19 @@ body {
 .container {
   width: 100%;
   max-width: 850px;
-  padding: 40px 20px;
+
+  /* Marge basse pour que la bannière de mise à jour ne recouvre pas le footer */
+  padding: 40px 20px 88px;
 }
 
 header { text-align: center; margin-bottom: 30px; }
 header h1 span { color: var(--primary); }
 header p { color: var(--text-dim); margin-top: 6px; }
+
+header h1 a {
+  color: inherit;
+  text-decoration: none;
+}
 
 .card {
   background: var(--card-bg);
@@ -184,7 +191,7 @@ header p { color: var(--text-dim); margin-top: 6px; }
   border-bottom: 1px solid var(--border);
   padding-bottom: 6px;
 }
-.markdown-body h3 { color: #a5b4fc; }
+.markdown-body h3 { color: #a5b4fc; margin-top: 1.6rem; }
 .markdown-body ul { padding-left: 20px; }
 
 .markdown-body blockquote {
@@ -227,3 +234,55 @@ header p { color: var(--text-dim); margin-top: 6px; }
   box-shadow: 0 10px 30px rgb(0 0 0 / 50%);
   z-index: 50;
 }
+
+.site-footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.site-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.site-footer a {
+  color: var(--text-dim);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.site-footer a:hover,
+.site-footer a:focus-visible,
+.site-footer a.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.site-footer p { margin: 12px 0 0; }
+
+.legal-updated {
+  margin: 0 0 12px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.legal-back {
+  display: inline-block;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.markdown-body a { color: var(--primary); }
+.markdown-body a:hover { text-decoration: none; }
+
+/* Empêche les URL et identifiants longs d'élargir la page sur mobile */
+.markdown-body a,
+.markdown-body code { overflow-wrap: anywhere; }
