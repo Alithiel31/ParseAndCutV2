@@ -7,7 +7,20 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 
 ### Added
 
+- Legal pages served by the PWA at `/cgu`, `/politique-de-confidentialite` and
+  `/mentions-legales`, plus a footer linking to them. The privacy policy documents the only
+  third party the audio reaches (Groq, in the United States), the fact that uploads are deleted
+  at the end of each request, and the absence of accounts, cookies and analytics — it also
+  provides the public URL the Play Store listing requires
+- `react-router-dom` and a `pages/` directory: `App.tsx` becomes the shared layout (header,
+  footer, service-worker update banner, scroll reset) and the transcription view moves to
+  `pages/Home.tsx`
 - `LICENSE` file (MIT, already declared in `package.json` but not versioned until now)
+
+### Fixed
+
+- Long URLs no longer widen the page on narrow screens (`overflow-wrap` on links and inline
+  code inside `.markdown-body`)
 
 ## [1.0.0] - 2026-08-05
 
