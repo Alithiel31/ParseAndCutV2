@@ -22,6 +22,14 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 - Long URLs no longer widen the page on narrow screens (`overflow-wrap` on links and inline
   code inside `.markdown-body`)
 
+### Security
+
+- The generated notes are now sanitized with DOMPurify before being injected into the page.
+  `marked` dropped its `sanitize` option in v5, so raw HTML in the Markdown reached the DOM
+  untouched — and that Markdown comes from the LLM, hence indirectly from the uploaded audio.
+  A payload such as `<img src=x onerror=…>` executed in the page; it no longer does, and the
+  legitimate Markdown rendering is unchanged
+
 ## [1.0.0] - 2026-08-05
 
 Monorepo release: the backend is restructured into a layered (MVC-style) package, and the
