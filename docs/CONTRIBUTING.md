@@ -26,9 +26,9 @@ FFmpeg must be installed locally (`ffmpeg -version`) to run the app outside Dock
 ## Reproducing the CI checks locally
 
 ```bash
-# Linting (Python) — same as .github/workflows/lint.yml
-npm run lint
-npm run lint:py    # flake8 app
+# Linting — same as .github/workflows/lint.yml
+npm run lint                    # flake8 app (backend)
+cd frontend && npm run lint     # oxlint (frontend)
 
 # Unit tests
 pytest

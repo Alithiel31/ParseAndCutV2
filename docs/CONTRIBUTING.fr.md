@@ -26,9 +26,9 @@ FFmpeg doit être installé localement (`ffmpeg -version`) pour lancer l'app hor
 ## Reproduire les vérifications de la CI en local
 
 ```bash
-# Lint (Python) — identique à .github/workflows/lint.yml
-npm run lint
-npm run lint:py    # flake8 app
+# Lint — identique à .github/workflows/lint.yml
+npm run lint                    # flake8 app (backend)
+cd frontend && npm run lint     # oxlint (frontend)
 
 # Tests unitaires
 pytest
