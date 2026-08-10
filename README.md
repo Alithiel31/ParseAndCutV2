@@ -38,7 +38,7 @@ This project covers, end to end:
 - **AI**: Groq API — Whisper Large V3 (transcription) + Llama 3.3 70B (structuring)
 - **Frontend**: [`frontend/`](./frontend) — React + Vite Progressive Web App, packaged as a TWA (Trusted Web Activity) for Android
 - **Containerization & deployment**: Docker Compose (backend + frontend containers), Raspberry Pi target via a `docker context`, Cloudflare Tunnel for HTTPS/public access with no port forwarding — see [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md)
-- **CI/CD**: GitHub Actions — linting (flake8, ESLint, Stylelint) and integration tests (FastAPI app boot, `/health`, `/process` error paths) on every push/PR
+- **CI/CD**: GitHub Actions — linting (flake8 for the backend, oxlint for the frontend), unit tests (pytest), and integration tests (FastAPI app boot, `/health`, `/process` error paths) on every push/PR
 - **Operational history**: migrated the hosting platform from Railway to a self-hosted Docker/Pi setup — see [`docs/Troubleshooting.md`](./docs/Troubleshooting.md)
 - **Documentation**: versioned changelog ([Keep a Changelog](https://keepachangelog.com/en/1.0.0/)), tagged releases (SemVer)
 
@@ -142,17 +142,18 @@ Check the [`/health`](https://parseandcut.alithiel31.dev/api/health) endpoint an
 ## Testing & CI
 
 ```bash
-# Linting (Python, JS, CSS) — same checks as the lint.yml workflow
-npm run lint
+# Linting — same checks as the lint.yml workflow
+npm run lint                    # flake8 (backend)
+cd frontend && npm run lint     # oxlint (frontend)
 
-# Unit tests (FastAPI routes mocked against FFmpeg/Groq)
+# Unit tests (FastAPI routes mocked against FFmpeg/Groq) — same as the integration.yml workflow
 pytest
 ```
 
 Two workflows run on every push/PR to `main`:
 
-- **CI Lint** (`.github/workflows/lint.yml`): flake8, ESLint, Stylelint
-- **CI Integration** (`.github/workflows/integration.yml`): boots the FastAPI app and checks `/`, `/health`, and the `/process` error paths (missing file → 400, unsupported format → 415)
+- **CI Lint** (`.github/workflows/lint.yml`): flake8 (backend), oxlint (frontend)
+- **CI Integration** (`.github/workflows/integration.yml`): runs the pytest suite, then boots the FastAPI app and checks `/`, `/health`, and the `/process` error paths (missing file → 400, unsupported format → 415)
 
 ## Releases & versioning
 

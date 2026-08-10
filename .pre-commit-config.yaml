@@ -4,17 +4,3 @@ repos:
     hooks:
       - id: flake8
         args: [--max-line-length=120, --ignore=E501,W503]
-
-  - repo: local
-    hooks:
-      - id: eslint
-        name: ESLint
-        entry: npx eslint
-        language: system
-        files: \.js$
-
-      - id: stylelint
-        name: Stylelint
-        entry: npx stylelint
-        language: system
-        files: \.css$

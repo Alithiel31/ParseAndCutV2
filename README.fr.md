@@ -38,7 +38,7 @@ Ce projet couvre, de bout en bout :
 - **IA** : API Groq — Whisper Large V3 (transcription) + Llama 3.3 70B (structuration)
 - **Frontend** : [`frontend/`](./frontend) — Progressive Web App React + Vite, packagée en TWA (Trusted Web Activity) pour Android
 - **Conteneurisation & déploiement** : Docker Compose (conteneurs backend + frontend), cible Raspberry Pi via un `docker context`, tunnel Cloudflare pour le HTTPS/l'accès public sans ouverture de port — voir [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md)
-- **CI/CD** : GitHub Actions — lint (flake8, ESLint, Stylelint) et tests d'intégration (démarrage de l'app FastAPI, `/health`, cas d'erreur de `/process`) à chaque push/PR
+- **CI/CD** : GitHub Actions — lint (flake8 pour le backend, oxlint pour le frontend), tests unitaires (pytest) et tests d'intégration (démarrage de l'app FastAPI, `/health`, cas d'erreur de `/process`) à chaque push/PR
 - **Historique opérationnel** : migration de la plateforme d'hébergement de Railway vers une infra auto-hébergée Docker/Pi — voir [`docs/Troubleshooting.fr.md`](./docs/Troubleshooting.fr.md)
 - **Documentation** : changelog versionné ([Keep a Changelog](https://keepachangelog.com/en/1.0.0/)), releases taguées (SemVer)
 
@@ -142,17 +142,18 @@ L'endpoint [`/health`](https://parseandcut.alithiel31.dev/api/health) permet de 
 ## Tests & CI
 
 ```bash
-# Lint (Python, JS, CSS) — mêmes vérifications que le workflow lint.yml
-npm run lint
+# Lint — mêmes vérifications que le workflow lint.yml
+npm run lint                    # flake8 (backend)
+cd frontend && npm run lint     # oxlint (frontend)
 
-# Tests unitaires (routes FastAPI, FFmpeg/Groq mockés)
+# Tests unitaires (routes FastAPI, FFmpeg/Groq mockés) — comme le workflow integration.yml
 pytest
 ```
 
 Deux workflows tournent à chaque push/PR sur `main` :
 
-- **CI Lint** (`.github/workflows/lint.yml`) : flake8, ESLint, Stylelint
-- **CI Integration** (`.github/workflows/integration.yml`) : démarre l'app FastAPI et vérifie `/`, `/health`, ainsi que les cas d'erreur de `/process` (fichier manquant → 400, format non supporté → 415)
+- **CI Lint** (`.github/workflows/lint.yml`) : flake8 (backend), oxlint (frontend)
+- **CI Integration** (`.github/workflows/integration.yml`) : lance la suite pytest, puis démarre l'app FastAPI et vérifie `/`, `/health`, ainsi que les cas d'erreur de `/process` (fichier manquant → 400, format non supporté → 415)
 
 ## Releases & versioning
 
