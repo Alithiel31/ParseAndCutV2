@@ -84,8 +84,8 @@ export default function Home() {
 
         {error && <div className="error-banner">⚠️ {error}</div>}
 
-        <div className="mode-selector">
-          <label className="mode-option">
+        <div className="mode-selector" role="radiogroup" aria-label="Type de résultat">
+          <label className={`mode-option${mode === "summary" ? " active" : ""}`}>
             <input
               type="radio"
               name="mode"
@@ -93,9 +93,9 @@ export default function Home() {
               checked={mode === "summary"}
               onChange={() => setMode("summary")}
             />
-            🧠 Résumé IA
+            <span>🧠 Résumé IA</span>
           </label>
-          <label className="mode-option">
+          <label className={`mode-option${mode === "transcript" ? " active" : ""}`}>
             <input
               type="radio"
               name="mode"
@@ -103,7 +103,7 @@ export default function Home() {
               checked={mode === "transcript"}
               onChange={() => setMode("transcript")}
             />
-            📄 Transcription basique
+            <span>📄 Transcription basique</span>
           </label>
         </div>
 
