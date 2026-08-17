@@ -5,6 +5,8 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-17
+
 ### Added
 
 - A `mode` option (`summary` or `transcript`) on `/process` and `/api/transcribe`, exposed in
@@ -34,6 +36,9 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
   Whisper's `verbose_json` segments as raw dicts, not attribute-accessible objects
 - Uploads over 1 MB rejected with a 413, and long transcriptions with a 504, due to Nginx's
   default `client_max_body_size` and `proxy_read_timeout` — both raised in `nginx.conf`
+- Nginx's `proxy_read_timeout`/`proxy_send_timeout` raised from 300s to 600s: the Groq client
+  timeout (240s per call) combined with `transcrire_chunk`'s up-to-2 retries on timeout could
+  reach ~480s for a single chunk, leaving too little headroom under the previous 300s budget
 
 ### Security
 

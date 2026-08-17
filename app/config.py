@@ -37,7 +37,11 @@ client  = None
 
 if api_key:
     try:
-        client = Groq(api_key=api_key, timeout=240.0)  # Aligné avec le timeout serveur (300s)
+        # 240s par appel, jusqu'à 2 tentatives sur timeout (transcrire_chunk) : ~480s
+        # dans le pire cas pour un seul chunk. Le proxy Nginx en amont (frontend/
+        # nginx.conf) laisse 600s pour absorber ce cas, plus quelques chunks
+        # supplémentaires traités normalement.
+        client = Groq(api_key=api_key, timeout=240.0)
         logger.info("✅ Groq Client initialisé")
     except Exception as e:
         logger.error(f"❌ Erreur init Groq: {e}")
