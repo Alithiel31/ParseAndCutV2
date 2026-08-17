@@ -4,6 +4,7 @@ Routes de transcription : upload audio -> découpage -> transcription -> fiche M
 import os
 import shutil
 import subprocess
+import tempfile
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -46,7 +47,7 @@ def process(audio: Optional[UploadFile] = File(None), mode: str = Form("summary"
         filename = f"audio_{os.getpid()}.mp3"
 
     # Préfixe PID pour éviter les collisions entre requêtes simultanées
-    input_path    = f"/tmp/{os.getpid()}_{filename}"
+    input_path    = os.path.join(tempfile.gettempdir(), f"{os.getpid()}_{filename}")
     chunks_créés  = []
 
     try:

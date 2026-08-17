@@ -139,3 +139,112 @@ class TestProcessRouteFlow:
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = client_app.post("/process", files=files)
         assert resp.status_code == 502
+
+
+class TestApiTranscribeRoute:
+    """/api/transcribe est un alias de /process (même vue FastAPI) — on
+    revérifie ici les cas clés pour garantir que l'alias reste fonctionnel
+    et cohérent avec /process."""
+
+    def test_sans_fichier(self, client_app, monkeypatch):
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        resp = client_app.post("/api/transcribe")
+        assert resp.status_code == 400
+
+    def test_extension_refusee(self, client_app, monkeypatch):
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        files = {"audio": ("notes.txt", b"pas de l'audio", "text/plain")}
+        resp = client_app.post("/api/transcribe", files=files)
+        assert resp.status_code == 415
+
+    def test_groq_non_configure(self, client_app, monkeypatch):
+        monkeypatch.setattr(transcribe, "client", None)
+
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe", files=files)
+        assert resp.status_code == 503
+
+    def test_mode_invalide(self, client_app, monkeypatch):
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe", files=files, data={"mode": "bogus"})
+        assert resp.status_code == 400
+
+    def test_succes(self, client_app, monkeypatch, tmp_path):
+        fake_chunk = tmp_path / "chunk_0.mp3"
+        fake_chunk.write_bytes(b"faux audio")
+
+        monkeypatch.setattr(
+            transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
+        )
+        monkeypatch.setattr(
+            transcribe, "transcrire_chunk", lambda path, retries=2: "Texte transcrit. "
+        )
+
+        fake_groq_client = MagicMock()
+        fake_completion = MagicMock()
+        fake_completion.choices[0].message.content = "# Fiche générée"
+        fake_groq_client.chat.completions.create.return_value = fake_completion
+        monkeypatch.setattr(transcribe, "client", fake_groq_client)
+
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe", files=files)
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["mode"] == "summary"
+        assert data["markdown"] == "# Fiche générée"
+        assert data["stats"]["chunks"] == 1
+        assert data["stats"]["transcription_chars"] > 0
+
+    def test_succes_mode_transcript(self, client_app, monkeypatch, tmp_path):
+        fake_chunk = tmp_path / "chunk_0.mp3"
+        fake_chunk.write_bytes(b"faux audio")
+
+        monkeypatch.setattr(
+            transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
+        )
+        monkeypatch.setattr(
+            transcribe, "transcrire_chunk", lambda path, retries=2: "Texte transcrit. "
+        )
+
+        fake_groq_client = MagicMock()
+        monkeypatch.setattr(transcribe, "client", fake_groq_client)
+
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe", files=files, data={"mode": "transcript"})
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["mode"] == "transcript"
+        assert data["transcript"] == "Texte transcrit."
+        fake_groq_client.chat.completions.create.assert_not_called()
+
+    def test_decoupage_echoue(self, client_app, monkeypatch):
+        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: [])
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe", files=files)
+        assert resp.status_code == 422
+
+    def test_transcription_echoue(self, client_app, monkeypatch, tmp_path):
+        fake_chunk = tmp_path / "chunk_0.mp3"
+        fake_chunk.write_bytes(b"faux audio")
+
+        monkeypatch.setattr(
+            transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
+        )
+
+        def _raise(*a, **k):
+            raise RuntimeError("Transcription échouée après 2 tentatives")
+
+        monkeypatch.setattr(transcribe, "transcrire_chunk", _raise)
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe", files=files)
+        assert resp.status_code == 502
