@@ -8,7 +8,13 @@ LANGUAGE=fr
 PORT=5000
 
 # Origines autorisées pour le frontend PWA séparé (CORS), séparées par des virgules.
-# Pas nécessaire en prod si nginx sert le frontend ET reverse-proxy /api/* vers ce
-# backend sur le même domaine (parseandcut.alithiel31.dev) : c'est du same-origin.
-# Utile uniquement en dev local (Vite sur :5173 qui tape sur uvicorn sur :5000).
+# Défaut : https://parseandcut.alithiel31.dev (same-origin en prod, nginx sert le
+# frontend ET reverse-proxy /api/* vers ce backend). Surcharger en dev local avec
+# l'origine Vite (:5173 qui tape sur uvicorn sur :5000).
 CORS_ORIGINS=http://localhost:5173
+
+# Taille max d'upload en Mo (défaut 300, en plus des 500 Mo côté nginx).
+MAX_UPLOAD_SIZE_MB=300
+
+# Limite de requêtes sur /process, format "N/period" (ex: "5/minute").
+RATE_LIMIT_PROCESS=5/minute

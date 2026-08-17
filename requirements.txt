@@ -11,6 +11,9 @@ groq==1.5.0
 # Sécurisation des noms de fichiers (utilisé dans le code)
 werkzeug==3.1.8
 
+# Rate limiting sur /process (protection anti-abus des crédits Groq)
+slowapi==0.1.9
+
 # Variables d'environnement
 python-dotenv==1.2.2
 

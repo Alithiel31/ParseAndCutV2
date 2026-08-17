@@ -92,7 +92,9 @@ Nginx (conteneur frontend) sert les fichiers statiques du PWA et reverse-proxy `
 | `PORT` | ❌ | `5000` | Port d'écoute du backend |
 | `CHUNK_DURATION_SEC` | ❌ | `600` | Durée des chunks en secondes |
 | `FFMPEG_PATH` | ❌ | `ffmpeg` | Chemin vers le binaire FFmpeg |
-| `CORS_ORIGINS` | ❌ | `*` | Origines autorisées séparées par des virgules — utile uniquement en dev local (Vite sur `:5173` qui tape sur Uvicorn sur `:5000`) ; pas nécessaire en prod, nginx sert en same-origin |
+| `CORS_ORIGINS` | ❌ | `https://parseandcut.alithiel31.dev` | Origines autorisées séparées par des virgules — à surcharger en dev local (Vite sur `:5173` qui tape sur Uvicorn sur `:5000`) |
+| `MAX_UPLOAD_SIZE_MB` | ❌ | `300` | Taille max d'upload vérifiée côté backend (en plus du `client_max_body_size` de nginx) |
+| `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Limite de requêtes sur `/process` (par IP), format `N/period` |
 | `FLASK_DEBUG` | ❌ | `false` | Mode debug (dev uniquement) |
 
 ## Installation locale
@@ -171,6 +173,10 @@ Une Release GitHub est ensuite créée à partir du tag, avec sa description rep
 ## Contribuer
 
 Voir [`docs/CONTRIBUTING.fr.md`](./docs/CONTRIBUTING.fr.md) pour l'environnement de développement, comment reproduire les vérifications de la CI en local, et le format des PR/releases.
+
+## Sécurité
+
+Voir [`docs/SECURITY.fr.md`](./docs/SECURITY.fr.md) pour signaler une vulnérabilité.
 
 ## Licence
 

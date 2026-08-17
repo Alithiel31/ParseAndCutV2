@@ -5,6 +5,25 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 
 ## [Unreleased]
 
+### Added
+
+- Rate limiting on `/process` and `/api/transcribe` (`slowapi`, default `5/minute` per IP,
+  configurable via `RATE_LIMIT_PROCESS`) to protect Groq API credits and the Raspberry Pi from
+  anonymous abuse
+- Explicit server-side upload size limit (`MAX_UPLOAD_SIZE_MB`, default 300), enforced by
+  streaming the upload to disk in chunks and aborting past the limit — previously only nginx's
+  `client_max_body_size` (500 MB) bounded upload size
+- `.github/dependabot.yml`: weekly dependency update PRs for pip, npm (root and `frontend/`)
+  and GitHub Actions
+- `docs/SECURITY.md` / `docs/SECURITY.fr.md`: vulnerability disclosure policy
+- Docker image now runs as a non-root `appuser` instead of root
+
+### Changed
+
+- `CORS_ORIGINS` now defaults to `https://parseandcut.alithiel31.dev` instead of `*` — the
+  wildcard let any third-party site's JavaScript call the public API directly through visitors'
+  browsers; local dev still overrides it to the Vite origin
+
 ## [1.1.0] - 2026-08-17
 
 ### Added

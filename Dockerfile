@@ -19,5 +19,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Utilisateur non-root : évite qu'un process compromis (ex: via FFmpeg) ait les
+# droits root dans le conteneur. /tmp reste accessible en écriture par défaut.
+RUN useradd --create-home --shell /bin/false appuser
+USER appuser
+
 # Uvicorn sert l'application ASGI FastAPI (remplace Gunicorn+Flask)
 CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2

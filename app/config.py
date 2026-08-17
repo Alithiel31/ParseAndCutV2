@@ -20,16 +20,26 @@ if not os.getenv("RAILWAY_ENVIRONMENT"):
 
 # --- CORS (pour le frontend PWA séparé, ex: ParseAndCutPWA) ---
 # CORS_ORIGINS : liste d'origines séparées par des virgules (ex: "https://monapp.netlify.app,http://localhost:5173")
-_cors_origins_env = os.getenv("CORS_ORIGINS", "*")
+# Par défaut : le domaine de prod (same-origin via nginx). En dev local, surcharger
+# avec l'origine Vite (ex: http://localhost:5173) via la variable d'env.
+_cors_origins_env = os.getenv("CORS_ORIGINS", "https://parseandcut.alithiel31.dev")
 CORS_ORIGINS = [o.strip() for o in _cors_origins_env.split(",")] if _cors_origins_env != "*" else ["*"]
 
 # Extensions audio autorisées
 ALLOWED_EXTENSIONS = {'mp3', 'mp4', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac', 'opus'}
 
-PORT           = int(os.getenv("PORT", 5000))
-FFMPEG_PATH    = os.getenv("FFMPEG_PATH", "ffmpeg")
-LANGUAGE       = os.getenv("LANGUAGE", "fr")
-CHUNK_DURATION = int(os.getenv("CHUNK_DURATION_SEC", 600))  # 10 min par chunk
+PORT             = int(os.getenv("PORT", 5000))
+FFMPEG_PATH      = os.getenv("FFMPEG_PATH", "ffmpeg")
+LANGUAGE         = os.getenv("LANGUAGE", "fr")
+CHUNK_DURATION   = int(os.getenv("CHUNK_DURATION_SEC", 600))  # 10 min par chunk
+
+# Taille max d'upload en Mo, vérifiée côté backend en plus du client_max_body_size
+# de nginx (500 Mo) — protège le déploiement direct (dev, ou si nginx est contourné).
+MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", 300))
+
+# Limite de requêtes sur /process (slowapi), au format "N/period" (ex: "5/minute").
+# Protège les crédits Groq et les ressources du Raspberry Pi contre les abus anonymes.
+RATE_LIMIT_PROCESS = os.getenv("RATE_LIMIT_PROCESS", "5/minute")
 
 # --- INITIALISATION GROQ ---
 api_key = os.environ.get("GROQ_API_KEY")
