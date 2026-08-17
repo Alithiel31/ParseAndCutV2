@@ -97,7 +97,7 @@ def process(audio: Optional[UploadFile] = File(None), mode: str = Form("summary"
         if mode == "summary":
             logger.info("🧠 Structuration avec Llama 3...")
             completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="openai/gpt-oss-120b",
                 messages=[{"role": "user", "content": construire_prompt(texte_complet)}],
                 temperature=0.4,
                 max_tokens=4096

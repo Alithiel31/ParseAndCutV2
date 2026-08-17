@@ -69,7 +69,7 @@ export default function Confidentialite() {
         <li>
           <strong>Groq, Inc.</strong> (États-Unis), qui exécute la transcription automatique
           (modèle <code>whisper-large-v3</code>) puis la mise en forme du texte (modèle{" "}
-          <code>llama-3.3-70b-versatile</code>). Les segments audio, puis le texte transcrit,
+          <code>openai/gpt-oss-120b</code>). Les segments audio, puis le texte transcrit,
           lui sont envoyés via son interface de programmation. Ses traitements sont régis par sa
           propre politique de confidentialité :{" "}
           <a href="https://groq.com/privacy-policy/" target="_blank" rel="noopener noreferrer">
