@@ -1,41 +1,53 @@
 import { useMemo, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import type { TranscribeStats } from "../api";
+import type { TranscribeMode, TranscribeStats } from "../api";
 
 interface ResultViewProps {
-  markdown: string;
+  mode: TranscribeMode;
+  markdown?: string;
+  transcript?: string;
   stats: TranscribeStats;
 }
 
-export default function ResultView({ markdown, stats }: ResultViewProps) {
+export default function ResultView({ mode, markdown, transcript, stats }: ResultViewProps) {
   const [copied, setCopied] = useState(false);
+  const isSummary = mode === "summary";
 
   // Le Markdown vient du LLM, donc indirectement de l'audio déposé : `marked` ne filtre
   // pas le HTML brut, il faut l'assainir avant de l'injecter. Le profil `html` écarte
   // SVG et MathML, qu'une fiche de révision ne contient jamais.
   const html = useMemo(
     () =>
-      DOMPurify.sanitize(marked.parse(markdown, { async: false }) as string, {
-        USE_PROFILES: { html: true },
-      }),
-    [markdown]
+      isSummary
+        ? DOMPurify.sanitize(marked.parse(markdown ?? "", { async: false }) as string, {
+            USE_PROFILES: { html: true },
+          })
+        : "",
+    [isSummary, markdown]
   );
 
   function handleCopy() {
-    // Copie le texte brut rendu (sans balises HTML)
-    const tmp = document.createElement("div");
-    tmp.innerHTML = html;
-    navigator.clipboard.writeText(tmp.innerText).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    if (isSummary) {
+      // Copie le texte brut rendu (sans balises HTML)
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      navigator.clipboard.writeText(tmp.innerText).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    } else {
+      navigator.clipboard.writeText(transcript ?? "").then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
   }
 
   return (
     <section id="resultArea">
       <div className="result-header">
-        <h2>📝 Fiche de résumé</h2>
+        <h2>{isSummary ? "📝 Fiche de résumé" : "📄 Transcription"}</h2>
         <button className="btn-secondary" onClick={handleCopy}>
           {copied ? "✅ Copié !" : "📋 Copier"}
         </button>
@@ -46,7 +58,11 @@ export default function ResultView({ markdown, stats }: ResultViewProps) {
         <span>📝 {stats.transcription_chars.toLocaleString()} caractères transcrits</span>
       </div>
 
-      <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
+      {isSummary ? (
+        <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
+      ) : (
+        <div className="markdown-body transcript-body">{transcript}</div>
+      )}
     </section>
   );
 }

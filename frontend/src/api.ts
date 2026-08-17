@@ -1,10 +1,14 @@
+export type TranscribeMode = "summary" | "transcript";
+
 export interface TranscribeStats {
   chunks: number;
   transcription_chars: number;
 }
 
 export interface TranscribeResult {
-  markdown: string;
+  mode: TranscribeMode;
+  markdown?: string;
+  transcript?: string;
   stats: TranscribeStats;
 }
 
@@ -17,9 +21,13 @@ const API_URL = import.meta.env.VITE_API_URL || "";
 
 export class ApiError extends Error {}
 
-export async function transcribeAudio(file: File): Promise<TranscribeResult> {
+export async function transcribeAudio(
+  file: File,
+  mode: TranscribeMode = "summary"
+): Promise<TranscribeResult> {
   const formData = new FormData();
   formData.append("audio", file);
+  formData.append("mode", mode);
 
   const response = await fetch(`${API_URL}/api/transcribe`, {
     method: "POST",

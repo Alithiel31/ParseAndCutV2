@@ -78,6 +78,22 @@ header h1 a {
   min-height: 24px;
 }
 
+.mode-selector {
+  display: flex;
+  gap: 1rem;
+  margin: 12px 0;
+}
+
+.mode-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+
+.mode-option input[type="radio"] { accent-color: var(--primary); }
+
 .btn-primary {
   width: 100%;
   background: var(--primary);
@@ -184,6 +200,11 @@ header h1 a {
   margin-top: 0.5rem;
   line-height: 1.7;
   font-size: 0.95rem;
+}
+
+.transcript-body {
+  white-space: pre-wrap;
+  font-family: inherit;
 }
 
 .markdown-body h1, .markdown-body h2 {
