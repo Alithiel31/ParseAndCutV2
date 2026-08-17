@@ -3,6 +3,7 @@ Découpage et validation des fichiers audio (FFmpeg).
 """
 import os
 import subprocess
+import tempfile
 
 from app.config import ALLOWED_EXTENSIONS, CHUNK_DURATION, FFMPEG_PATH, logger
 
@@ -39,7 +40,7 @@ def découper_audio(input_path: str, interval_sec: int = CHUNK_DURATION) -> list
 
     while True:
         start_time = part * interval_sec
-        chunk_path = f"/tmp/chunk_{os.getpid()}_{part}.mp3"
+        chunk_path = os.path.join(tempfile.gettempdir(), f"chunk_{os.getpid()}_{part}.mp3")
 
         cmd = [
             FFMPEG_PATH,
