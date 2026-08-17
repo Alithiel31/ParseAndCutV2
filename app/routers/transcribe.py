@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from groq import APIError
 from werkzeug.utils import secure_filename
@@ -21,7 +21,7 @@ router = APIRouter()
 
 @router.post('/process')
 @router.post('/api/transcribe')  # alias explicite pour les clients API/PWA
-def process(audio: Optional[UploadFile] = File(None)):
+def process(audio: Optional[UploadFile] = File(None), mode: str = Form("summary")):
 
     # --- Vérifications préalables ---
     if not client:
@@ -29,6 +29,9 @@ def process(audio: Optional[UploadFile] = File(None)):
 
     if audio is None or not audio.filename:
         raise HTTPException(status_code=400, detail="Aucun fichier audio reçu")
+
+    if mode not in ("summary", "transcript"):
+        raise HTTPException(status_code=400, detail="Mode invalide (attendu : 'summary' ou 'transcript')")
 
     if not allowed_file(audio.filename):
         raise HTTPException(
@@ -81,25 +84,31 @@ def process(audio: Optional[UploadFile] = File(None)):
 
         logger.info(f"✅ Transcription complète : {len(texte_complet):,} caractères")
 
-        # --- 3. Structuration LLM ---
-        logger.info("🧠 Structuration avec Llama 3...")
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": construire_prompt(texte_complet)}],
-            temperature=0.4,
-            max_tokens=4096
-        )
-
-        markdown = completion.choices[0].message.content
-        logger.info("✅ Fiche générée avec succès")
-
-        return JSONResponse({
-            "markdown": markdown,
+        response_body = {
+            "mode": mode,
             "stats": {
                 "chunks":               len(chunks_créés),
                 "transcription_chars":  len(texte_complet)
             }
-        })
+        }
+
+        # --- 3. Structuration LLM (uniquement en mode résumé) ---
+        if mode == "summary":
+            logger.info("🧠 Structuration avec Llama 3...")
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": construire_prompt(texte_complet)}],
+                temperature=0.4,
+                max_tokens=4096
+            )
+
+            response_body["markdown"] = completion.choices[0].message.content
+            logger.info("✅ Fiche générée avec succès")
+        else:
+            logger.info("⏭️  Mode transcription basique — pas d'appel LLM")
+            response_body["transcript"] = texte_complet.strip()
+
+        return JSONResponse(response_body)
 
     # --- Gestion d'erreurs granulaire ---
     except HTTPException:

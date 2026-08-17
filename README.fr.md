@@ -13,7 +13,7 @@
 
 > 🚀 **Service en ligne** : [parseandcut.alithiel31.dev](https://parseandcut.alithiel31.dev)
 
-**Meetup Killer** transforme vos enregistrements audio de cours ou de réunions en fiches de révision structurées au format Markdown. Conçu pour tourner sur **Raspberry Pi**, déployé via **Docker**, exposé publiquement via un **tunnel Cloudflare** — aucun port ouvert sur le routeur. Le traitement lourd est délégué à l'API **Groq** (Whisper Large V3 pour la transcription, Llama 3.3 70B pour la structuration).
+**Meetup Killer** transforme vos enregistrements audio de cours ou de réunions en fiches de révision structurées au format Markdown — ou, si vous préférez juste la transcription brute, c'est possible aussi. Conçu pour tourner sur **Raspberry Pi**, déployé via **Docker**, exposé publiquement via un **tunnel Cloudflare** — aucun port ouvert sur le routeur. Le traitement lourd est délégué à l'API **Groq** (Whisper Large V3 pour la transcription, Llama 3.3 70B pour la structuration).
 
 ## Sommaire
 
@@ -48,6 +48,7 @@ Ce projet couvre, de bout en bout :
 |---|---|
 | 🎙️ Transcription longue durée | Découpage automatique en chunks de 10 min — **supporte les audios > 1h** |
 | 🧠 Fiche structurée | Résumé, titres hiérarchiques, mots-clés en gras, blocs définition |
+| 🔀 Deux modes de sortie | Résumé IA ou transcription brute au choix, par upload — le mode transcription saute entièrement l'appel Llama |
 | 🌐 Interface moderne | Drag & drop, barre de progression par étape, affichage des stats |
 | ✅ Validation robuste | Vérification type + taille côté client ET serveur |
 | 🔁 Retry automatique | Relance Whisper en cas de timeout réseau (backoff exponentiel) |
@@ -73,7 +74,8 @@ flowchart LR
 
     BE -->|FFmpeg| CHUNK["chunks de 10 min"]
     CHUNK -->|Whisper Large V3| TXT["transcription brute"]
-    TXT -->|Llama 3.3 70B| MD["Markdown structuré"]
+    TXT -->|"mode=summary"<br/>Llama 3.3 70B| MD["Markdown structuré"]
+    TXT -->|"mode=transcript"| RAW["transcription brute renvoyée telle quelle"]
 
     TUN["Tunnel Cloudflare<br/>parseandcut.alithiel31.dev"] --> FE
     U -.->|accès public| TUN

@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import DropZone from "../components/DropZone";
 import ProgressSteps, { STEPS } from "../components/ProgressSteps";
 import ResultView from "../components/ResultView";
-import { transcribeAudio, type TranscribeResult } from "../api";
+import { transcribeAudio, type TranscribeMode, type TranscribeResult } from "../api";
 
 type Phase = "idle" | "loading" | "done" | "error";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<TranscribeMode>("summary");
   const [phase, setPhase] = useState<Phase>("idle");
   const [activeStep, setActiveStep] = useState<string>(STEPS[0].id);
   const [statusText, setStatusText] = useState("");
@@ -41,7 +42,9 @@ export default function Home() {
     const stepTimings: [string, number, string][] = [
       ["step-cut", 1500, "Découpage en cours…"],
       ["step-whisper", 4000, "Transcription Whisper…"],
-      ["step-llm", 9000, "Structuration avec Llama…"],
+      ...(mode === "summary"
+        ? ([["step-llm", 9000, "Structuration avec Llama…"]] as [string, number, string][])
+        : []),
     ];
     timers.current = stepTimings.map(([id, delay, label]) =>
       window.setTimeout(() => {
@@ -51,10 +54,10 @@ export default function Home() {
     );
 
     try {
-      const data = await transcribeAudio(file);
+      const data = await transcribeAudio(file, mode);
       clearTimers();
       setResult(data);
-      setStatusText("✅ Fiche générée !");
+      setStatusText(mode === "summary" ? "✅ Fiche générée !" : "✅ Transcription terminée !");
       setPhase("done");
     } catch (e) {
       clearTimers();
@@ -81,8 +84,31 @@ export default function Home() {
 
         {error && <div className="error-banner">⚠️ {error}</div>}
 
+        <div className="mode-selector">
+          <label className="mode-option">
+            <input
+              type="radio"
+              name="mode"
+              value="summary"
+              checked={mode === "summary"}
+              onChange={() => setMode("summary")}
+            />
+            🧠 Résumé IA
+          </label>
+          <label className="mode-option">
+            <input
+              type="radio"
+              name="mode"
+              value="transcript"
+              checked={mode === "transcript"}
+              onChange={() => setMode("transcript")}
+            />
+            📄 Transcription basique
+          </label>
+        </div>
+
         <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
-          🚀 Générer la fiche de révision
+          {mode === "summary" ? "🚀 Générer la fiche de révision" : "🚀 Transcrire l'audio"}
         </button>
       </div>
 
@@ -96,7 +122,12 @@ export default function Home() {
 
       {result && (
         <div ref={resultRef}>
-          <ResultView markdown={result.markdown} stats={result.stats} />
+          <ResultView
+            mode={result.mode}
+            markdown={result.markdown}
+            transcript={result.transcript}
+            stats={result.stats}
+          />
         </div>
       )}
     </main>

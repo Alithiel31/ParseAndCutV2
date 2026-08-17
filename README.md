@@ -13,7 +13,7 @@
 
 > 🚀 **Live service**: [parseandcut.alithiel31.dev](https://parseandcut.alithiel31.dev)
 
-**Meetup Killer** turns audio recordings of lectures or meetings into structured Markdown study notes. Built to run on a **Raspberry Pi**, deployed via **Docker**, exposed publicly through a **Cloudflare Tunnel** — no port forwarding. Heavy processing is offloaded to the **Groq API** (Whisper Large V3 for transcription, Llama 3.3 70B for structuring).
+**Meetup Killer** turns audio recordings of lectures or meetings into structured Markdown study notes — or, if you just want the raw transcript, that too. Built to run on a **Raspberry Pi**, deployed via **Docker**, exposed publicly through a **Cloudflare Tunnel** — no port forwarding. Heavy processing is offloaded to the **Groq API** (Whisper Large V3 for transcription, Llama 3.3 70B for structuring).
 
 ## Table of contents
 
@@ -48,6 +48,7 @@ This project covers, end to end:
 |---|---|
 | 🎙️ Long audio support | Auto-split into 10-min chunks — **handles recordings over 1 hour** |
 | 🧠 Structured notes | Summary, hierarchical headings, bold keywords, definition blocks |
+| 🔀 Two output modes | Pick AI summary or raw transcript per upload — transcript mode skips the Llama call entirely |
 | 🌐 Modern UI | Drag & drop, step-by-step progress bar, processing stats |
 | ✅ Robust validation | File type + size checked both client-side and server-side |
 | 🔁 Auto retry | Whisper retried on network timeout with exponential backoff |
@@ -73,7 +74,8 @@ flowchart LR
 
     BE -->|FFmpeg| CHUNK["10-min chunks"]
     CHUNK -->|Whisper Large V3| TXT["raw transcription"]
-    TXT -->|Llama 3.3 70B| MD["structured Markdown"]
+    TXT -->|"mode=summary"<br/>Llama 3.3 70B| MD["structured Markdown"]
+    TXT -->|"mode=transcript"| RAW["raw transcript returned as-is"]
 
     TUN["Cloudflare Tunnel<br/>parseandcut.alithiel31.dev"] --> FE
     U -.->|public access| TUN

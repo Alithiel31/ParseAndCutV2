@@ -7,6 +7,9 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 
 ### Added
 
+- A `mode` option (`summary` or `transcript`) on `/process` and `/api/transcribe`, exposed in
+  the UI as a choice between the AI-structured study sheet (unchanged default) and the raw
+  Whisper transcript. Selecting `transcript` skips the Llama 3.3 70B structuring call entirely
 - Legal pages served by the PWA at `/cgu`, `/politique-de-confidentialite` and
   `/mentions-legales`, plus a footer linking to them. The privacy policy documents the only
   third party the audio reaches (Groq, in the United States), the fact that uploads are deleted
