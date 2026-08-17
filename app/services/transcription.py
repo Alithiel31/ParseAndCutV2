@@ -9,11 +9,15 @@ from groq import APIError, APITimeoutError
 from app.config import LANGUAGE, client, logger
 
 
-def transcrire_chunk(path: str, retries: int = 2) -> str:
+def transcrire_chunk(path: str, retries: int = 2) -> tuple[str, list[dict]]:
     """
     Transcrit un chunk audio via Groq Whisper.
     Retente automatiquement avec backoff exponentiel en cas de timeout.
     2 tentatives max pour rester dans le timeout serveur (300s).
+
+    Retourne (texte_complet, segments) où segments est la liste des
+    passages horodatés : [{"start": float, "end": float, "text": str}, ...]
+    (temps en secondes, relatifs au début de ce chunk).
     """
     for attempt in range(retries):
         try:
@@ -22,9 +26,13 @@ def transcrire_chunk(path: str, retries: int = 2) -> str:
                     file=(os.path.basename(path), f.read()),
                     model="whisper-large-v3",
                     language=LANGUAGE,
-                    response_format="text"
+                    response_format="verbose_json"
                 )
-            return result
+            segments = [
+                {"start": seg.start, "end": seg.end, "text": seg.text.strip()}
+                for seg in result.segments
+            ]
+            return result.text, segments
 
         except APITimeoutError:
             wait = 2 ** attempt  # 1s puis 2s

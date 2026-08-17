@@ -61,7 +61,12 @@ class TestProcessRouteFlow:
             transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
         )
         monkeypatch.setattr(
-            transcribe, "transcrire_chunk", lambda path, retries=2: "Texte transcrit. "
+            transcribe,
+            "transcrire_chunk",
+            lambda path, retries=2: (
+                "Texte transcrit. ",
+                [{"start": 0.0, "end": 1.5, "text": "Texte transcrit."}],
+            ),
         )
 
         fake_groq_client = MagicMock()
@@ -88,7 +93,12 @@ class TestProcessRouteFlow:
             transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
         )
         monkeypatch.setattr(
-            transcribe, "transcrire_chunk", lambda path, retries=2: "Texte transcrit. "
+            transcribe,
+            "transcrire_chunk",
+            lambda path, retries=2: (
+                "Texte transcrit. ",
+                [{"start": 0.0, "end": 1.5, "text": "Texte transcrit."}],
+            ),
         )
 
         fake_groq_client = MagicMock()
@@ -100,7 +110,7 @@ class TestProcessRouteFlow:
         assert resp.status_code == 200
         data = resp.json()
         assert data["mode"] == "transcript"
-        assert data["transcript"] == "Texte transcrit."
+        assert data["transcript"] == "[00:00] Texte transcrit."
         assert "markdown" not in data
         assert data["stats"]["chunks"] == 1
         assert data["stats"]["transcription_chars"] > 0
@@ -112,6 +122,38 @@ class TestProcessRouteFlow:
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = client_app.post("/process", files=files, data={"mode": "bogus"})
         assert resp.status_code == 400
+
+    def test_transcript_horodatage_decale_par_chunk(self, client_app, monkeypatch, tmp_path):
+        # Deux chunks : le second doit être décalé de CHUNK_DURATION secondes
+        # (les chunks font tous exactement CHUNK_DURATION, sauf le dernier).
+        fake_chunk_0 = tmp_path / "chunk_0.mp3"
+        fake_chunk_1 = tmp_path / "chunk_1.mp3"
+        fake_chunk_0.write_bytes(b"faux audio 0")
+        fake_chunk_1.write_bytes(b"faux audio 1")
+
+        monkeypatch.setattr(
+            transcribe,
+            "découper_audio",
+            lambda *a, **k: [str(fake_chunk_0), str(fake_chunk_1)],
+        )
+        monkeypatch.setattr(transcribe, "CHUNK_DURATION", 3600)  # 1h par chunk
+
+        segments_par_chunk = {
+            str(fake_chunk_0): ("Début. ", [{"start": 0.0, "end": 2.0, "text": "Début."}]),
+            str(fake_chunk_1): ("Suite. ", [{"start": 5.0, "end": 7.0, "text": "Suite."}]),
+        }
+        monkeypatch.setattr(
+            transcribe, "transcrire_chunk", lambda path, retries=2: segments_par_chunk[path]
+        )
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/process", files=files, data={"mode": "transcript"})
+
+        assert resp.status_code == 200
+        data = resp.json()
+        # Chunk 1 : offset de 3600s (1h) + 5s -> 1:00:05
+        assert data["transcript"] == "[00:00] Début.\n[1:00:05] Suite."
 
     def test_decoupage_echoue(self, client_app, monkeypatch):
         # découper_audio ne produit aucun chunk (fichier vide/corrompu)
@@ -181,7 +223,12 @@ class TestApiTranscribeRoute:
             transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
         )
         monkeypatch.setattr(
-            transcribe, "transcrire_chunk", lambda path, retries=2: "Texte transcrit. "
+            transcribe,
+            "transcrire_chunk",
+            lambda path, retries=2: (
+                "Texte transcrit. ",
+                [{"start": 0.0, "end": 1.5, "text": "Texte transcrit."}],
+            ),
         )
 
         fake_groq_client = MagicMock()
@@ -208,7 +255,12 @@ class TestApiTranscribeRoute:
             transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
         )
         monkeypatch.setattr(
-            transcribe, "transcrire_chunk", lambda path, retries=2: "Texte transcrit. "
+            transcribe,
+            "transcrire_chunk",
+            lambda path, retries=2: (
+                "Texte transcrit. ",
+                [{"start": 0.0, "end": 1.5, "text": "Texte transcrit."}],
+            ),
         )
 
         fake_groq_client = MagicMock()
@@ -220,7 +272,7 @@ class TestApiTranscribeRoute:
         assert resp.status_code == 200
         data = resp.json()
         assert data["mode"] == "transcript"
-        assert data["transcript"] == "Texte transcrit."
+        assert data["transcript"] == "[00:00] Texte transcrit."
         fake_groq_client.chat.completions.create.assert_not_called()
 
     def test_decoupage_echoue(self, client_app, monkeypatch):
