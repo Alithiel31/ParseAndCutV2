@@ -13,7 +13,7 @@
 
 > 🚀 **Service en ligne** : [parseandcut.alithiel31.dev](https://parseandcut.alithiel31.dev)
 
-**Meetup Killer** transforme vos enregistrements audio de cours ou de réunions en fiches de révision structurées au format Markdown — ou, si vous préférez juste la transcription brute, c'est possible aussi. Conçu pour tourner sur **Raspberry Pi**, déployé via **Docker**, exposé publiquement via un **tunnel Cloudflare** — aucun port ouvert sur le routeur. Le traitement lourd est délégué à l'API **Groq** (Whisper Large V3 pour la transcription, Llama 3.3 70B pour la structuration).
+**Meetup Killer** transforme vos enregistrements audio de cours ou de réunions en fiches de révision structurées au format Markdown — ou, si vous préférez juste la transcription brute, c'est possible aussi. Conçu pour tourner sur **Raspberry Pi**, déployé via **Docker**, exposé publiquement via un **tunnel Cloudflare** — aucun port ouvert sur le routeur. Le traitement lourd est délégué à l'API **Groq** (Whisper Large V3 pour la transcription, GPT-OSS 120B pour la structuration).
 
 ## Sommaire
 
@@ -35,7 +35,7 @@ Ce projet couvre, de bout en bout :
 
 - **Backend** : FastAPI + Uvicorn (Python 3.10), migré depuis une implémentation Flask d'origine
 - **Traitement audio** : FFmpeg (découpage des enregistrements longs pour respecter la limite Groq de 25 Mo par fichier)
-- **IA** : API Groq — Whisper Large V3 (transcription) + Llama 3.3 70B (structuration)
+- **IA** : API Groq — Whisper Large V3 (transcription) + GPT-OSS 120B (structuration)
 - **Frontend** : [`frontend/`](./frontend) — Progressive Web App React + Vite, packagée en TWA (Trusted Web Activity) pour Android
 - **Conteneurisation & déploiement** : Docker Compose (conteneurs backend + frontend), cible Raspberry Pi via un `docker context`, tunnel Cloudflare pour le HTTPS/l'accès public sans ouverture de port — voir [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md)
 - **CI/CD** : GitHub Actions — lint (flake8 pour le backend, oxlint pour le frontend), tests unitaires (pytest) et tests d'intégration (démarrage de l'app FastAPI, `/health`, cas d'erreur de `/process`) à chaque push/PR
@@ -48,7 +48,7 @@ Ce projet couvre, de bout en bout :
 |---|---|
 | 🎙️ Transcription longue durée | Découpage automatique en chunks de 10 min — **supporte les audios > 1h** |
 | 🧠 Fiche structurée | Résumé, titres hiérarchiques, mots-clés en gras, blocs définition |
-| 🔀 Deux modes de sortie | Résumé IA ou transcription brute au choix, par upload — le mode transcription saute entièrement l'appel Llama |
+| 🔀 Deux modes de sortie | Résumé IA ou transcription brute au choix, par upload — le mode transcription saute entièrement l'appel LLM, et fournit des horodatages par segment |
 | 🌐 Interface moderne | Drag & drop, barre de progression par étape, affichage des stats |
 | ✅ Validation robuste | Vérification type + taille côté client ET serveur |
 | 🔁 Retry automatique | Relance Whisper en cas de timeout réseau (backoff exponentiel) |
@@ -74,7 +74,7 @@ flowchart LR
 
     BE -->|FFmpeg| CHUNK["chunks de 10 min"]
     CHUNK -->|Whisper Large V3| TXT["transcription brute"]
-    TXT -->|"mode=summary"<br/>Llama 3.3 70B| MD["Markdown structuré"]
+    TXT -->|"mode=summary"<br/>GPT-OSS 120B| MD["Markdown structuré"]
     TXT -->|"mode=transcript"| RAW["transcription brute renvoyée telle quelle"]
 
     TUN["Tunnel Cloudflare<br/>parseandcut.alithiel31.dev"] --> FE

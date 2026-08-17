@@ -28,8 +28,10 @@ def transcrire_chunk(path: str, retries: int = 2) -> tuple[str, list[dict]]:
                     language=LANGUAGE,
                     response_format="verbose_json"
                 )
+            # "segments" n'est pas un champ typé du modèle Transcription du SDK Groq
+            # (extra="allow") : c'est du JSON brut désérialisé en dicts, pas en objets.
             segments = [
-                {"start": seg.start, "end": seg.end, "text": seg.text.strip()}
+                {"start": seg["start"], "end": seg["end"], "text": seg["text"].strip()}
                 for seg in result.segments
             ]
             return result.text, segments

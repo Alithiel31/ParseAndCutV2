@@ -2,7 +2,7 @@
   "name": "meetup-killer",
   "version": "1.0.0",
   "type": "module",
-  "description": "Transcription et résumé de cours audio avec Whisper et Llama 3",
+  "description": "Transcription et résumé de cours audio avec Whisper et IA",
   "scripts": {
     "lint": "npm run lint:py",
     "lint:py": "python -m flake8 app"

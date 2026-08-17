@@ -1,6 +1,6 @@
 # ParseAndCutPWA
 
-Frontend PWA (React + Vite + TypeScript) pour [ParseAndCutV2](../ParseAndCutV2) — transcription et structuration de cours audio via l'API Groq (Whisper + Llama 3).
+Frontend PWA (React + Vite + TypeScript) pour [ParseAndCutV2](../ParseAndCutV2) — transcription et structuration de cours audio via l'API Groq (Whisper + un LLM).
 
 Ce projet consomme l'API JSON exposée par le backend FastAPI de ParseAndCutV2 (endpoint `POST /api/transcribe`). Il ne contient aucune logique de transcription : c'est uniquement l'interface, installable et fonctionnant partiellement hors-ligne (app shell mis en cache).
 

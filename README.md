@@ -13,7 +13,7 @@
 
 > 🚀 **Live service**: [parseandcut.alithiel31.dev](https://parseandcut.alithiel31.dev)
 
-**Meetup Killer** turns audio recordings of lectures or meetings into structured Markdown study notes — or, if you just want the raw transcript, that too. Built to run on a **Raspberry Pi**, deployed via **Docker**, exposed publicly through a **Cloudflare Tunnel** — no port forwarding. Heavy processing is offloaded to the **Groq API** (Whisper Large V3 for transcription, Llama 3.3 70B for structuring).
+**Meetup Killer** turns audio recordings of lectures or meetings into structured Markdown study notes — or, if you just want the raw transcript, that too. Built to run on a **Raspberry Pi**, deployed via **Docker**, exposed publicly through a **Cloudflare Tunnel** — no port forwarding. Heavy processing is offloaded to the **Groq API** (Whisper Large V3 for transcription, GPT-OSS 120B for structuring).
 
 ## Table of contents
 
@@ -35,7 +35,7 @@ This project covers, end to end:
 
 - **Backend**: FastAPI + Uvicorn (Python 3.10), migrated from an original Flask implementation
 - **Audio processing**: FFmpeg (chunking long recordings for the Groq 25 MB per-file limit)
-- **AI**: Groq API — Whisper Large V3 (transcription) + Llama 3.3 70B (structuring)
+- **AI**: Groq API — Whisper Large V3 (transcription) + GPT-OSS 120B (structuring)
 - **Frontend**: [`frontend/`](./frontend) — React + Vite Progressive Web App, packaged as a TWA (Trusted Web Activity) for Android
 - **Containerization & deployment**: Docker Compose (backend + frontend containers), Raspberry Pi target via a `docker context`, Cloudflare Tunnel for HTTPS/public access with no port forwarding — see [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md)
 - **CI/CD**: GitHub Actions — linting (flake8 for the backend, oxlint for the frontend), unit tests (pytest), and integration tests (FastAPI app boot, `/health`, `/process` error paths) on every push/PR
@@ -48,7 +48,7 @@ This project covers, end to end:
 |---|---|
 | 🎙️ Long audio support | Auto-split into 10-min chunks — **handles recordings over 1 hour** |
 | 🧠 Structured notes | Summary, hierarchical headings, bold keywords, definition blocks |
-| 🔀 Two output modes | Pick AI summary or raw transcript per upload — transcript mode skips the Llama call entirely |
+| 🔀 Two output modes | Pick AI summary or raw transcript per upload — transcript mode skips the LLM call entirely, and comes with per-segment timestamps |
 | 🌐 Modern UI | Drag & drop, step-by-step progress bar, processing stats |
 | ✅ Robust validation | File type + size checked both client-side and server-side |
 | 🔁 Auto retry | Whisper retried on network timeout with exponential backoff |
@@ -74,7 +74,7 @@ flowchart LR
 
     BE -->|FFmpeg| CHUNK["10-min chunks"]
     CHUNK -->|Whisper Large V3| TXT["raw transcription"]
-    TXT -->|"mode=summary"<br/>Llama 3.3 70B| MD["structured Markdown"]
+    TXT -->|"mode=summary"<br/>GPT-OSS 120B| MD["structured Markdown"]
     TXT -->|"mode=transcript"| RAW["raw transcript returned as-is"]
 
     TUN["Cloudflare Tunnel<br/>parseandcut.alithiel31.dev"] --> FE

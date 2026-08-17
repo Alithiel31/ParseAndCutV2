@@ -43,7 +43,7 @@ export default function Home() {
       ["step-cut", 1500, "Découpage en cours…"],
       ["step-whisper", 4000, "Transcription Whisper…"],
       ...(mode === "summary"
-        ? ([["step-llm", 9000, "Structuration avec Llama…"]] as [string, number, string][])
+        ? ([["step-llm", 9000, "Structuration par l'IA…"]] as [string, number, string][])
         : []),
     ];
     timers.current = stepTimings.map(([id, delay, label]) =>
