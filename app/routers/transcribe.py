@@ -12,12 +12,20 @@ from fastapi.responses import JSONResponse
 from groq import APIError
 from werkzeug.utils import secure_filename
 
-from app.config import client, logger
+from app.config import CHUNK_DURATION, client, logger
 from app.services.audio import allowed_file, découper_audio, ALLOWED_EXTENSIONS
 from app.services.prompt import construire_prompt
 from app.services.transcription import transcrire_chunk
 
 router = APIRouter()
+
+
+def _formater_horodatage(secondes: float) -> str:
+    """Formate un nombre de secondes en mm:ss (ou h:mm:ss au-delà d'une heure)."""
+    total = int(secondes)
+    h, reste = divmod(total, 3600)
+    m, s = divmod(reste, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
 
 
 @router.post('/process')
@@ -71,10 +79,20 @@ def process(audio: Optional[UploadFile] = File(None), mode: str = Form("summary"
         # --- 2. Transcription chunk par chunk ---
         logger.info("🎙️  Transcription Whisper...")
         texte_complet = ""
+        segments_horodatés = []
 
         for i, path in enumerate(chunks_créés):
             logger.info(f"  [{i+1}/{len(chunks_créés)}] {os.path.basename(path)}")
-            texte_complet += transcrire_chunk(path) + " "
+            texte_chunk, segments = transcrire_chunk(path)
+            texte_complet += texte_chunk + " "
+
+            offset = i * CHUNK_DURATION
+            for seg in segments:
+                segments_horodatés.append({
+                    "start": seg["start"] + offset,
+                    "text": seg["text"],
+                })
+
             os.remove(path)  # Nettoyage immédiat après transcription
 
         if not texte_complet.strip():
@@ -107,7 +125,11 @@ def process(audio: Optional[UploadFile] = File(None), mode: str = Form("summary"
             logger.info("✅ Fiche générée avec succès")
         else:
             logger.info("⏭️  Mode transcription basique — pas d'appel LLM")
-            response_body["transcript"] = texte_complet.strip()
+            response_body["transcript"] = "\n".join(
+                f"[{_formater_horodatage(seg['start'])}] {seg['text']}"
+                for seg in segments_horodatés
+                if seg["text"]
+            )
 
         return JSONResponse(response_body)
 
