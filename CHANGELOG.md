@@ -9,7 +9,9 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 
 - A `mode` option (`summary` or `transcript`) on `/process` and `/api/transcribe`, exposed in
   the UI as a choice between the AI-structured study sheet (unchanged default) and the raw
-  Whisper transcript. Selecting `transcript` skips the Llama 3.3 70B structuring call entirely
+  Whisper transcript. Selecting `transcript` skips the LLM structuring call entirely
+- Per-segment timestamps (`[mm:ss]`, or `[h:mm:ss]` past one hour) on the raw transcript
+  (`mode=transcript`), using Groq Whisper's `verbose_json` response format
 - Legal pages served by the PWA at `/cgu`, `/politique-de-confidentialite` and
   `/mentions-legales`, plus a footer linking to them. The privacy policy documents the only
   third party the audio reaches (Groq, in the United States), the fact that uploads are deleted
@@ -24,6 +26,14 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 
 - Long URLs no longer widen the page on narrow screens (`overflow-wrap` on links and inline
   code inside `.markdown-body`)
+- `/process` and `/api/transcribe` returning 500 on any platform without a `/tmp` directory
+  (Windows) — temp file paths were hardcoded instead of using `tempfile.gettempdir()`
+- The AI structuring call (`mode=summary`) failing with a 502 since Groq deprecated
+  `llama-3.3-70b-versatile` — replaced by `openai/gpt-oss-120b`
+- `mode=transcript` returning 500 on real (non-mocked) transcriptions — the Groq SDK returns
+  Whisper's `verbose_json` segments as raw dicts, not attribute-accessible objects
+- Uploads over 1 MB rejected with a 413, and long transcriptions with a 504, due to Nginx's
+  default `client_max_body_size` and `proxy_read_timeout` — both raised in `nginx.conf`
 
 ### Security
 

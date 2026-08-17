@@ -54,8 +54,8 @@ export default function MentionsLegales() {
       </p>
       <p>
         Les marques et modèles cités appartiennent à leurs titulaires respectifs : Groq est une
-        marque de Groq, Inc. ; Llama est un modèle de Meta Platforms, Inc. ; Whisper est un
-        modèle d'OpenAI, ici utilisé par l'intermédiaire de l'interface de programmation de Groq.
+        marque de Groq, Inc. ; Whisper et le modèle de structuration utilisés sont des modèles
+        d'OpenAI, Inc., ici utilisés par l'intermédiaire de l'interface de programmation de Groq.
       </p>
 
       <h3>Crédits techniques</h3>

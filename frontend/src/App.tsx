@@ -31,7 +31,7 @@ export default function App() {
         <h1>
           <Link to="/">🎓 Assistant Transcripteur <span>IA</span></Link>
         </h1>
-        <p>Transcription Whisper · Structuration Llama 3 · PWA installable</p>
+        <p>Transcription Whisper · Structuration par IA · PWA installable</p>
       </header>
 
       <Outlet />

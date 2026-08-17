@@ -113,7 +113,7 @@ def process(audio: Optional[UploadFile] = File(None), mode: str = Form("summary"
 
         # --- 3. Structuration LLM (uniquement en mode résumé) ---
         if mode == "summary":
-            logger.info("🧠 Structuration avec Llama 3...")
+            logger.info("🧠 Structuration par IA...")
             completion = client.chat.completions.create(
                 model="openai/gpt-oss-120b",
                 messages=[{"role": "user", "content": construire_prompt(texte_complet)}],
