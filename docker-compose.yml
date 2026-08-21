@@ -11,8 +11,18 @@ services:
   frontend:
     build:
       context: ./frontend
-    ports:
-      - "8091:80"
     depends_on:
       - backend
     restart: unless-stopped
+    networks:
+      - default
+      - traefik-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.parseandcut.rule=Host(`parseandcut.alithiel31.dev`)"
+      - "traefik.http.routers.parseandcut.entrypoints=web"
+      - "traefik.http.services.parseandcut.loadbalancer.server.port=80"
+
+networks:
+  traefik-net:
+    external: true
