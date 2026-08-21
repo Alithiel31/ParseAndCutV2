@@ -2,22 +2,45 @@
 Routes de transcription : upload audio -> découpage -> transcription -> fiche Markdown.
 """
 import os
-import shutil
 import subprocess
 import tempfile
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from groq import APIError
 from werkzeug.utils import secure_filename
 
-from app.config import CHUNK_DURATION, client, logger
+from app.config import CHUNK_DURATION, MAX_UPLOAD_SIZE_MB, RATE_LIMIT_PROCESS, client, logger
+from app.limiter import limiter
 from app.services.audio import allowed_file, découper_audio, ALLOWED_EXTENSIONS
 from app.services.prompt import construire_prompt
 from app.services.transcription import transcrire_chunk
 
 router = APIRouter()
+
+_UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1 Mo par bloc de copie
+MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+
+def _sauvegarder_avec_limite(source, destination_path: str, max_bytes: int) -> None:
+    """Copie `source` (UploadFile.file) vers `destination_path` par blocs, en
+    interrompant et en supprimant le fichier partiel si `max_bytes` est dépassé."""
+    total = 0
+    with open(destination_path, "wb") as f:
+        while True:
+            block = source.read(_UPLOAD_CHUNK_SIZE)
+            if not block:
+                break
+            total += len(block)
+            if total > max_bytes:
+                f.close()
+                os.remove(destination_path)
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Fichier trop volumineux (max {MAX_UPLOAD_SIZE_MB} Mo)"
+                )
+            f.write(block)
 
 
 def _formater_horodatage(secondes: float) -> str:
@@ -30,7 +53,8 @@ def _formater_horodatage(secondes: float) -> str:
 
 @router.post('/process')
 @router.post('/api/transcribe')  # alias explicite pour les clients API/PWA
-def process(audio: Optional[UploadFile] = File(None), mode: str = Form("summary")):
+@limiter.limit(RATE_LIMIT_PROCESS)
+def process(request: Request, audio: Optional[UploadFile] = File(None), mode: str = Form("summary")):
 
     # --- Vérifications préalables ---
     if not client:
@@ -59,8 +83,7 @@ def process(audio: Optional[UploadFile] = File(None), mode: str = Form("summary"
     chunks_créés  = []
 
     try:
-        with open(input_path, "wb") as f:
-            shutil.copyfileobj(audio.file, f)
+        _sauvegarder_avec_limite(audio.file, input_path, MAX_UPLOAD_SIZE_BYTES)
         size_mo = os.path.getsize(input_path) / 1024 / 1024
         logger.info(f"📥 Fichier reçu : {filename} ({size_mo:.1f} Mo)")
 
