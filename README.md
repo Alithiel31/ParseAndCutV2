@@ -67,8 +67,10 @@ flowchart LR
     U["User (browser / TWA)"] -->|upload audio| FE
 
     subgraph Pi["Raspberry Pi (Docker Compose)"]
-        FE["frontend container<br/>nginx · frontend/<br/>:8091"]
+        TRA["Traefik<br/>reverse proxy · :8000"]
+        FE["frontend container<br/>nginx · frontend/<br/>traefik-net"]
         BE["backend container<br/>FastAPI + Uvicorn<br/>:5000 (internal only)"]
+        TRA -->|"Host: parseandcut.alithiel31.dev"| FE
         FE -->|reverse-proxy /api/*| BE
     end
 
@@ -77,11 +79,11 @@ flowchart LR
     TXT -->|"mode=summary"<br/>GPT-OSS 120B| MD["structured Markdown"]
     TXT -->|"mode=transcript"| RAW["raw transcript returned as-is"]
 
-    TUN["Cloudflare Tunnel<br/>parseandcut.alithiel31.dev"] --> FE
+    TUN["Cloudflare Tunnel<br/>parseandcut.alithiel31.dev"] --> TRA
     U -.->|public access| TUN
 ```
 
-Nginx (frontend container) serves the PWA static files and reverse-proxies `/api/` to the backend — same-origin, no CORS to manage in production. The Cloudflare Tunnel handles HTTPS and the domain name — no certificate to manage manually, no port opened on the router.
+Nginx (frontend container) serves the PWA static files and reverse-proxies `/api/` to the backend — same-origin, no CORS to manage in production. Traefik (shared reverse proxy on the Pi) routes the public hostname to the frontend container via `traefik-net`, without exposing a dedicated port on the host. The Cloudflare Tunnel handles HTTPS and the domain name — no certificate to manage manually, no port opened on the router.
 
 ## Environment variables
 
@@ -134,7 +136,7 @@ Nginx (frontend container) serves the PWA static files and reverse-proxies `/api
 
 ## Deployment (Docker + Raspberry Pi)
 
-This is the production setup. This repo's `docker-compose.yml` runs the backend (internal network, port **5000**) and the [`frontend/`](./frontend) PWA (nginx, port **8091**) — see [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md) for the full procedure (creating the `docker context` to the Pi, building, configuring the Cloudflare ingress).
+This is the production setup. This repo's `docker-compose.yml` runs the backend (internal network, port **5000**) and the [`frontend/`](./frontend) PWA (nginx, routed via Traefik on `traefik-net`, no port exposed on the host) — see [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md) for the full procedure (creating the `docker context` to the Pi, building, configuring the Traefik labels and the Cloudflare ingress).
 
 ```bash
 docker context use rpi
