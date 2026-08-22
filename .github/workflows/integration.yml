@@ -27,13 +27,17 @@ jobs:
 
     - name: Run unit tests (pytest)
       env:
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        # Repli sur une clé factice : les secrets du repo ne sont pas exposés
+        # aux workflows déclenchés par une PR Dependabot. Cette clé ne sert
+        # qu'à rendre `client` "truthy" ci-dessous — aucun appel réseau réel
+        # n'est fait dans cette suite (les tests qui appellent Groq le mockent).
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY || 'ci-placeholder-key' }}
         RAILWAY_ENVIRONMENT: "true"
       run: pytest -v
 
     - name: Test import FastAPI app
       env:
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY || 'ci-placeholder-key' }}
         RAILWAY_ENVIRONMENT: "true"
       run: |
         python -c "from app.main import app; from app.config import ALLOWED_EXTENSIONS; \
@@ -44,7 +48,7 @@ jobs:
 
     - name: Start app and wait for readiness
       env:
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY || 'ci-placeholder-key' }}
         RAILWAY_ENVIRONMENT: "true"
         PORT: "5000"
       run: |
