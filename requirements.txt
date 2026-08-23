@@ -22,6 +22,6 @@ flake8==7.3.0
 # Tests
 # httpx : dépendance transitive de groq (client HTTP interne du SDK)
 # httpx2 : utilisé en priorité par starlette.testclient (httpx y est déprécié)
-pytest==8.3.4
+pytest==9.0.3
 httpx==0.28.1
 httpx2==2.10.0
