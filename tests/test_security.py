@@ -43,6 +43,24 @@ class TestRateLimit:
         assert resp.status_code == 429
 
 
+class TestRateLimitPerRealClientIp:
+    def test_quota_par_ip_forwardee_pas_mutualise(self, client_app):
+        # Le backend est toujours derrière un reverse proxy de confiance (nginx
+        # sur le Pi, edge Railway) : sans ProxyHeadersMiddleware (app/main.py),
+        # request.client.host vaudrait l'IP du proxy pour toutes les requêtes et
+        # le quota 5/minute serait partagé par tous les visiteurs. On vérifie ici
+        # que deux IP transmises via X-Forwarded-For ont bien des quotas distincts.
+        for _ in range(5):
+            resp = client_app.post("/process", headers={"X-Forwarded-For": "1.1.1.1"})
+            assert resp.status_code != 429
+
+        resp = client_app.post("/process", headers={"X-Forwarded-For": "1.1.1.1"})
+        assert resp.status_code == 429
+
+        resp_autre_ip = client_app.post("/process", headers={"X-Forwarded-For": "2.2.2.2"})
+        assert resp_autre_ip.status_code != 429
+
+
 class TestUploadSizeLimit:
     def test_fichier_trop_gros_rejete(self, client_app, monkeypatch):
         monkeypatch.setattr(transcribe, "client", MagicMock())

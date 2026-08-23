@@ -4,6 +4,7 @@ Routes de transcription : upload audio -> découpage -> transcription -> fiche M
 import os
 import subprocess
 import tempfile
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -78,8 +79,13 @@ def process(request: Request, audio: Optional[UploadFile] = File(None), mode: st
         # Fallback si le nom contient uniquement des caractères non-ASCII
         filename = f"audio_{os.getpid()}.mp3"
 
-    # Préfixe PID pour éviter les collisions entre requêtes simultanées
-    input_path    = os.path.join(tempfile.gettempdir(), f"{os.getpid()}_{filename}")
+    # Identifiant unique par requête (pas le PID : avec plusieurs workers/threads,
+    # deux requêtes concurrentes peuvent partager le même PID et donc, si le PID
+    # seul suffisait, écraser/lire le fichier temporaire l'une de l'autre en cas
+    # de nom de fichier identique — ex. deux utilisateurs uploadant "cours.mp3"
+    # en même temps).
+    request_id    = uuid.uuid4().hex
+    input_path    = os.path.join(tempfile.gettempdir(), f"{request_id}_{filename}")
     chunks_créés  = []
 
     try:
@@ -89,7 +95,7 @@ def process(request: Request, audio: Optional[UploadFile] = File(None), mode: st
 
         # --- 1. Découpage ---
         logger.info("✂️  Découpage en chunks...")
-        chunks_créés = découper_audio(input_path)
+        chunks_créés = découper_audio(input_path, request_id)
 
         if not chunks_créés:
             raise HTTPException(
