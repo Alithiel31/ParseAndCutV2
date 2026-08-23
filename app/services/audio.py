@@ -14,11 +14,13 @@ def allowed_file(filename: str) -> bool:
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def découper_audio(input_path: str, interval_sec: int = CHUNK_DURATION) -> list[str]:
+def découper_audio(input_path: str, request_id: str, interval_sec: int = CHUNK_DURATION) -> list[str]:
     """
     Découpe l'audio en chunks MP3 pour l'API Groq (limite 25 Mo par chunk).
     10 min à 128k ≈ 9,6 Mo — bien en dessous de la limite Groq.
     1h d'audio = ~6 chunks traités séquentiellement.
+    `request_id` (unique par requête) évite toute collision de noms de chunks
+    entre deux requêtes concurrentes traitées par le même worker.
     Retourne la liste ordonnée des chemins de chunks créés.
     """
     chunks = []
@@ -40,7 +42,7 @@ def découper_audio(input_path: str, interval_sec: int = CHUNK_DURATION) -> list
 
     while True:
         start_time = part * interval_sec
-        chunk_path = os.path.join(tempfile.gettempdir(), f"chunk_{os.getpid()}_{part}.mp3")
+        chunk_path = os.path.join(tempfile.gettempdir(), f"chunk_{request_id}_{part}.mp3")
 
         cmd = [
             FFMPEG_PATH,
