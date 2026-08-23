@@ -4,11 +4,17 @@
 
 [![CI Lint](https://github.com/Alithiel31/ParseAndCutV2/actions/workflows/lint.yml/badge.svg)](https://github.com/Alithiel31/ParseAndCutV2/actions/workflows/lint.yml)
 [![CI Integration](https://github.com/Alithiel31/ParseAndCutV2/actions/workflows/integration.yml/badge.svg)](https://github.com/Alithiel31/ParseAndCutV2/actions/workflows/integration.yml)
-[![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python)](https://www.python.org/)
-[![Docker](https://img.shields.io/badge/Docker-Enabled-blue?logo=docker)](https://www.docker.com/)
-[![Groq](https://img.shields.io/badge/Powered%20by-Groq-orange)](https://groq.com/)
+[![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Frontend-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-PWA-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Nginx](https://img.shields.io/badge/Nginx-reverse%20proxy-009639?logo=nginx&logoColor=white)](https://nginx.org/)
+[![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-self--hosted-A22846?logo=raspberrypi&logoColor=white)](https://www.raspberrypi.com/)
+[![Groq](https://img.shields.io/badge/Powered%20by-Groq-F55036?logo=groq&logoColor=white)](https://groq.com/)
 [![Live](https://img.shields.io/badge/Live-parseandcut.alithiel31.dev-blue)](https://parseandcut.alithiel31.dev)
-[![Cloudflare](https://img.shields.io/badge/Tunnel-Cloudflare-orange?logo=cloudflare)](https://www.cloudflare.com/)
+[![Cloudflare](https://img.shields.io/badge/Tunnel-Cloudflare-F38020?logo=cloudflare&logoColor=white)](https://www.cloudflare.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > 🚀 **Live service**: [parseandcut.alithiel31.dev](https://parseandcut.alithiel31.dev)
@@ -67,8 +73,10 @@ flowchart LR
     U["User (browser / TWA)"] -->|upload audio| FE
 
     subgraph Pi["Raspberry Pi (Docker Compose)"]
-        FE["frontend container<br/>nginx · frontend/<br/>:8091"]
+        TRA["Traefik<br/>reverse proxy · :8000"]
+        FE["frontend container<br/>nginx · frontend/<br/>traefik-net"]
         BE["backend container<br/>FastAPI + Uvicorn<br/>:5000 (internal only)"]
+        TRA -->|"Host: parseandcut.alithiel31.dev"| FE
         FE -->|reverse-proxy /api/*| BE
     end
 
@@ -77,11 +85,11 @@ flowchart LR
     TXT -->|"mode=summary"<br/>GPT-OSS 120B| MD["structured Markdown"]
     TXT -->|"mode=transcript"| RAW["raw transcript returned as-is"]
 
-    TUN["Cloudflare Tunnel<br/>parseandcut.alithiel31.dev"] --> FE
+    TUN["Cloudflare Tunnel<br/>parseandcut.alithiel31.dev"] --> TRA
     U -.->|public access| TUN
 ```
 
-Nginx (frontend container) serves the PWA static files and reverse-proxies `/api/` to the backend — same-origin, no CORS to manage in production. The Cloudflare Tunnel handles HTTPS and the domain name — no certificate to manage manually, no port opened on the router.
+Nginx (frontend container) serves the PWA static files and reverse-proxies `/api/` to the backend — same-origin, no CORS to manage in production. Traefik (shared reverse proxy on the Pi) routes the public hostname to the frontend container via `traefik-net`, without exposing a dedicated port on the host. The Cloudflare Tunnel handles HTTPS and the domain name — no certificate to manage manually, no port opened on the router.
 
 ## Environment variables
 
@@ -134,7 +142,7 @@ Nginx (frontend container) serves the PWA static files and reverse-proxies `/api
 
 ## Deployment (Docker + Raspberry Pi)
 
-This is the production setup. This repo's `docker-compose.yml` runs the backend (internal network, port **5000**) and the [`frontend/`](./frontend) PWA (nginx, port **8091**) — see [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md) for the full procedure (creating the `docker context` to the Pi, building, configuring the Cloudflare ingress).
+This is the production setup. This repo's `docker-compose.yml` runs the backend (internal network, port **5000**) and the [`frontend/`](./frontend) PWA (nginx, routed via Traefik on `traefik-net`, no port exposed on the host) — see [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md) for the full procedure (creating the `docker context` to the Pi, building, configuring the Traefik labels and the Cloudflare ingress).
 
 ```bash
 docker context use rpi
