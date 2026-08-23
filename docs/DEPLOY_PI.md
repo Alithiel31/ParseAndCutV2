@@ -25,13 +25,18 @@ docker compose up --build -d
 ```
 
 Docker envoie le contexte de build (fichiers locaux de `app/` et `frontend/`) au démon
-distant du Pi — pas besoin de cloner quoi que ce soit sur le Pi. Le frontend sera exposé sur
-le port **8091** du Pi (`http://<ip-du-pi>:8091`), le backend n'est joignable qu'en
-interne via le réseau Docker (`backend:5000`).
+distant du Pi — pas besoin de cloner quoi que ce soit sur le Pi. Le frontend est routé via
+Traefik (réseau `traefik-net`, entrypoint `web` sur le port **8000**) au lieu d'exposer un
+port dédié sur l'hôte ; le backend n'est joignable qu'en interne via le réseau Docker
+(`backend:5000`).
 
 Pour repasser en local ensuite : `docker context use default`.
 
-## 3. Exposer via cloudflared
+## 3. Exposer via Traefik + cloudflared
+
+Le frontend est branché sur `traefik-net` (labels dans `docker-compose.yml`) : Traefik
+route `parseandcut.alithiel31.dev` vers ce conteneur via son entrypoint `web` (port
+**8000**), sans exposer de port dédié sur l'hôte.
 
 cloudflared tourne déjà sur le Pi. Éditer sa config du tunnel (généralement
 `~/.cloudflared/config.yml`) pour ajouter une entrée d'ingress **avant** la règle
@@ -40,7 +45,7 @@ catch-all `service: http_status:404` :
 ```yaml
 ingress:
   - hostname: parseandcut.alithiel31.dev
-    service: http://localhost:8091
+    service: http://localhost:8000
   # ... autres hostnames existants (ex: qcweather.alithiel31.dev) ...
   - service: http_status:404
 ```

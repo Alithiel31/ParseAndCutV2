@@ -1,12 +1,12 @@
 # Serveur ASGI (dev + prod, remplace Flask/Gunicorn)
-fastapi==0.139.0
-uvicorn==0.51.0
+fastapi==0.141.1
+uvicorn==0.52.3
 
 # Upload de fichiers multipart (requis par FastAPI pour UploadFile)
 python-multipart==0.0.32
 
 # API Groq
-groq==1.5.0
+groq==1.6.0
 
 # Sécurisation des noms de fichiers (utilisé dans le code)
 werkzeug==3.1.8
@@ -22,6 +22,6 @@ flake8==7.3.0
 # Tests
 # httpx : dépendance transitive de groq (client HTTP interne du SDK)
 # httpx2 : utilisé en priorité par starlette.testclient (httpx y est déprécié)
-pytest==8.3.4
+pytest==9.1.1
 httpx==0.28.1
 httpx2==2.10.0
