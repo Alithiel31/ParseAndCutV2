@@ -24,4 +24,4 @@ flake8==7.3.0
 # httpx2 : utilisé en priorité par starlette.testclient (httpx y est déprécié)
 pytest==9.1.1
 httpx==0.28.1
-httpx2==2.10.0
+httpx2==2.12.0
