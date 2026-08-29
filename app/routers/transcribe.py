@@ -4,6 +4,7 @@ Routes de transcription : upload audio -> découpage -> transcription -> fiche M
 import os
 import subprocess
 import tempfile
+import time
 import uuid
 from typing import Optional
 
@@ -14,7 +15,7 @@ from werkzeug.utils import secure_filename
 
 from app.config import CHUNK_DURATION, MAX_UPLOAD_SIZE_MB, RATE_LIMIT_PROCESS, client, logger
 from app.limiter import limiter
-from app.services.audio import allowed_file, découper_audio, ALLOWED_EXTENSIONS
+from app.services.audio import allowed_file, découper_audio, obtenir_duree_audio, ALLOWED_EXTENSIONS
 from app.services.prompt import construire_prompt
 from app.services.transcription import transcrire_chunk
 
@@ -93,9 +94,15 @@ def process(request: Request, audio: Optional[UploadFile] = File(None), mode: st
         size_mo = os.path.getsize(input_path) / 1024 / 1024
         logger.info(f"📥 Fichier reçu : {filename} ({size_mo:.1f} Mo)")
 
+        # Mesure du temps de traitement total (hors upload) et de la durée
+        # audio réelle — sert uniquement à alimenter les stats/logs (aucun
+        # impact sur le comportement métier).
+        début_traitement = time.perf_counter()
+        durée_audio_sec = obtenir_duree_audio(input_path)
+
         # --- 1. Découpage ---
         logger.info("✂️  Découpage en chunks...")
-        chunks_créés = découper_audio(input_path, request_id)
+        chunks_créés = découper_audio(input_path, request_id, duree_totale_sec=durée_audio_sec)
 
         if not chunks_créés:
             raise HTTPException(
@@ -159,6 +166,22 @@ def process(request: Request, audio: Optional[UploadFile] = File(None), mode: st
                 for seg in segments_horodatés
                 if seg["text"]
             )
+
+        # --- Stats de performance (mesure uniquement, aucun impact fonctionnel) ---
+        temps_traitement_sec = time.perf_counter() - début_traitement
+        response_body["stats"]["audio_duration_sec"] = (
+            round(durée_audio_sec, 2) if durée_audio_sec is not None else None
+        )
+        response_body["stats"]["processing_time_sec"] = round(temps_traitement_sec, 2)
+
+        if durée_audio_sec:
+            ratio = durée_audio_sec / temps_traitement_sec
+            logger.info(
+                f"⏱️  {_formater_horodatage(durée_audio_sec)} audio traité en "
+                f"{temps_traitement_sec:.1f}s (ratio {ratio:.0f}x)"
+            )
+        else:
+            logger.info(f"⏱️  Traitement terminé en {temps_traitement_sec:.1f}s (durée audio inconnue)")
 
         return JSONResponse(response_body)
 
