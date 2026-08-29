@@ -2,10 +2,14 @@
 Découpage et validation des fichiers audio (FFmpeg).
 """
 import os
+import re
 import subprocess
 import tempfile
+from typing import Optional
 
 from app.config import ALLOWED_EXTENSIONS, CHUNK_DURATION, FFMPEG_PATH, logger
+
+_DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d{2}):(\d{2})\.(\d+)")
 
 
 def allowed_file(filename: str) -> bool:
@@ -14,31 +18,50 @@ def allowed_file(filename: str) -> bool:
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def découper_audio(input_path: str, request_id: str, interval_sec: int = CHUNK_DURATION) -> list[str]:
+def obtenir_duree_audio(input_path: str) -> Optional[float]:
+    """Interroge FFmpeg pour obtenir la durée totale du fichier audio, en secondes.
+    Retourne None si FFmpeg est indisponible ou si la durée n'a pas pu être lue
+    (fichier vide/corrompu) — non bloquant, à usage purement informatif/mesure."""
+    try:
+        probe = subprocess.run(
+            [FFMPEG_PATH, "-i", input_path],
+            capture_output=True, text=True, timeout=30
+        )
+    except Exception:
+        return None
+
+    # FFmpeg écrit les infos (dont "Duration: HH:MM:SS.xx, ...") sur stderr
+    for line in probe.stderr.splitlines():
+        match = _DURATION_RE.search(line)
+        if match:
+            h, m, s, frac = match.groups()
+            return int(h) * 3600 + int(m) * 60 + int(s) + int(frac) / 10 ** len(frac)
+    return None
+
+
+def découper_audio(
+    input_path: str,
+    request_id: str,
+    interval_sec: int = CHUNK_DURATION,
+    duree_totale_sec: Optional[float] = None,
+) -> list[str]:
     """
     Découpe l'audio en chunks MP3 pour l'API Groq (limite 25 Mo par chunk).
     10 min à 128k ≈ 9,6 Mo — bien en dessous de la limite Groq.
     1h d'audio = ~6 chunks traités séquentiellement.
     `request_id` (unique par requête) évite toute collision de noms de chunks
     entre deux requêtes concurrentes traitées par le même worker.
+    `duree_totale_sec`, si déjà connue (cf. `obtenir_duree_audio`), évite de
+    reprober le fichier ici — sinon elle est calculée à la volée pour le log.
     Retourne la liste ordonnée des chemins de chunks créés.
     """
     chunks = []
     part   = 0
 
-    # Vérifie d'abord la durée totale pour logger une estimation
-    try:
-        probe = subprocess.run(
-            [FFMPEG_PATH, "-i", input_path],
-            capture_output=True, text=True, timeout=30
-        )
-        # FFmpeg écrit les infos sur stderr
-        for line in probe.stderr.splitlines():
-            if "Duration" in line:
-                logger.info(f"Durée détectée : {line.strip()}")
-                break
-    except Exception:
-        pass  # Non bloquant
+    if duree_totale_sec is None:
+        duree_totale_sec = obtenir_duree_audio(input_path)
+    if duree_totale_sec is not None:
+        logger.info(f"Durée détectée : {duree_totale_sec:.1f}s")
 
     while True:
         start_time = part * interval_sec
