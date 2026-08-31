@@ -27,6 +27,13 @@ const fr = {
   "dropzone.tooLarge": "Fichier trop volumineux (max {maxMb} Mo).",
   "dropzone.hint": "Glissez votre fichier audio ici ou cliquez pour choisir",
 
+  "notify.toggle": "🔔 Me notifier à la fin",
+  "notify.blocked": "Notifications bloquées — autorise-les dans les réglages du navigateur.",
+  "notify.title.summary": "Fiche de révision prête",
+  "notify.title.transcript": "Transcription prête",
+  "notify.body.summary": "Ta fiche de révision a été générée.",
+  "notify.body.transcript": "Ta transcription est terminée.",
+
   "steps.step-upload": "📤 Envoi",
   "steps.step-cut": "✂️ Découpage",
   "steps.step-whisper": "🎙️ Transcription",

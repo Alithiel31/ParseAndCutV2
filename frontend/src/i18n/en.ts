@@ -29,6 +29,13 @@ const en = {
   "dropzone.tooLarge": "File too large (max {maxMb} MB).",
   "dropzone.hint": "Drag your audio file here or click to choose one",
 
+  "notify.toggle": "🔔 Notify me when done",
+  "notify.blocked": "Notifications blocked — allow them in your browser settings.",
+  "notify.title.summary": "Study sheet ready",
+  "notify.title.transcript": "Transcript ready",
+  "notify.body.summary": "Your study sheet has been generated.",
+  "notify.body.transcript": "Your transcript is ready.",
+
   "steps.step-upload": "📤 Upload",
   "steps.step-cut": "✂️ Splitting",
   "steps.step-whisper": "🎙️ Transcription",

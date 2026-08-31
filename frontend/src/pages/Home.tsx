@@ -4,8 +4,11 @@ import ProgressSteps, { STEPS } from "../components/ProgressSteps";
 import ResultView from "../components/ResultView";
 import { transcribeAudio, type TranscribeMode, type TranscribeResult } from "../api";
 import { useLanguage, useTranslation } from "../i18n";
+import { getPermission, isNotificationSupported, notifyResult, requestPermission } from "../notifications";
 
 type Phase = "idle" | "loading" | "done" | "error";
+
+const NOTIFY_STORAGE_KEY = "pac_notify";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -15,10 +18,33 @@ export default function Home() {
   const [statusText, setStatusText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TranscribeResult | null>(null);
+  const [notifyEnabled, setNotifyEnabled] = useState(() => {
+    try {
+      return localStorage.getItem(NOTIFY_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   const resultRef = useRef<HTMLDivElement>(null);
   const timers = useRef<number[]>([]);
   const { t } = useTranslation();
   const { lang } = useLanguage();
+
+  async function handleNotifyToggle(checked: boolean) {
+    if (checked) {
+      const permission = getPermission() === "granted" ? "granted" : await requestPermission();
+      if (permission !== "granted") {
+        setError(t("notify.blocked"));
+        return;
+      }
+    }
+    setNotifyEnabled(checked);
+    try {
+      localStorage.setItem(NOTIFY_STORAGE_KEY, String(checked));
+    } catch {
+      // navigation privée / stockage désactivé : la préférence reste valide pour la session en cours
+    }
+  }
 
   useEffect(() => {
     if (phase === "done") {
@@ -62,6 +88,12 @@ export default function Home() {
       setResult(data);
       setStatusText(mode === "summary" ? t("home.status.summaryDone") : t("home.status.transcriptDone"));
       setPhase("done");
+      if (notifyEnabled && getPermission() === "granted") {
+        notifyResult(
+          t(mode === "summary" ? "notify.title.summary" : "notify.title.transcript"),
+          t(mode === "summary" ? "notify.body.summary" : "notify.body.transcript")
+        );
+      }
     } catch (e) {
       clearTimers();
       setError(e instanceof Error ? e.message : t("home.errors.unknown"));
@@ -111,6 +143,17 @@ export default function Home() {
             <span>{t("home.mode.transcript")}</span>
           </label>
         </div>
+
+        {isNotificationSupported() && (
+          <label className="notify-toggle">
+            <input
+              type="checkbox"
+              checked={notifyEnabled}
+              onChange={(e) => handleNotifyToggle(e.target.checked)}
+            />
+            <span>{t("notify.toggle")}</span>
+          </label>
+        )}
 
         <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
           {mode === "summary" ? t("home.submit.summary") : t("home.submit.transcript")}
