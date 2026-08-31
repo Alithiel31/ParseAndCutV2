@@ -1,7 +1,9 @@
 # Clé API obtenue sur https://console.groq.com/
 GROQ_API_KEY=
 
-# Langue du cours (fr, en, es, etc.)
+# Langue de sortie par défaut (fr ou en) si une requête n'envoie pas le
+# champ `lang` (ex. anciens clients PWA en cache). Whisper auto-détecte
+# toujours la langue parlée dans l'audio, indépendamment de ce réglage.
 LANGUAGE=fr
 
 #Port
