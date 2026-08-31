@@ -47,6 +47,27 @@ class TestProcessRouteValidation:
         resp = client_app.post("/process", files=files)
         assert resp.status_code == 503
 
+    def test_langue_invalide(self, client_app, monkeypatch):
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/process", files=files, data={"lang": "de"})
+        assert resp.status_code == 400
+
+    def test_message_erreur_traduit_en_anglais(self, client_app, monkeypatch):
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        resp = client_app.post("/process", data={"lang": "en"})
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "No audio file received"
+
+    def test_message_erreur_par_defaut_en_francais(self, client_app, monkeypatch):
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        resp = client_app.post("/process")
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "Aucun fichier audio reçu"
+
 
 class TestProcessRouteFlow:
     """Simule le pipeline complet sans FFmpeg ni appel réseau réel."""
@@ -122,6 +143,36 @@ class TestProcessRouteFlow:
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = client_app.post("/process", files=files, data={"mode": "bogus"})
         assert resp.status_code == 400
+
+    def test_succes_lang_anglais_propage_au_prompt(self, client_app, monkeypatch, tmp_path):
+        fake_chunk = tmp_path / "chunk_0.mp3"
+        fake_chunk.write_bytes(b"faux audio")
+
+        monkeypatch.setattr(
+            transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
+        )
+        monkeypatch.setattr(
+            transcribe,
+            "transcrire_chunk",
+            lambda path, retries=2: (
+                "Transcribed text. ",
+                [{"start": 0.0, "end": 1.5, "text": "Transcribed text."}],
+            ),
+        )
+
+        fake_groq_client = MagicMock()
+        fake_completion = MagicMock()
+        fake_completion.choices[0].message.content = "# Generated sheet"
+        fake_groq_client.chat.completions.create.return_value = fake_completion
+        monkeypatch.setattr(transcribe, "client", fake_groq_client)
+
+        files = {"audio": ("class.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/process", files=files, data={"lang": "en"})
+
+        assert resp.status_code == 200
+        assert resp.json()["markdown"] == "# Generated sheet"
+        sent_prompt = fake_groq_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+        assert "Respond only in English" in sent_prompt
 
     def test_transcript_horodatage_decale_par_chunk(self, client_app, monkeypatch, tmp_path):
         # Deux chunks : le second doit être décalé de CHUNK_DURATION secondes

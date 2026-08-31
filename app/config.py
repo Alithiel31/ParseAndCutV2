@@ -30,6 +30,10 @@ ALLOWED_EXTENSIONS = {'mp3', 'mp4', 'wav', 'm4a', 'ogg', 'webm', 'flac', 'aac', 
 
 PORT             = int(os.getenv("PORT", 5000))
 FFMPEG_PATH      = os.getenv("FFMPEG_PATH", "ffmpeg")
+# Langue de sortie par défaut (fiche + messages d'erreur) si une requête
+# n'envoie pas le champ `lang` (ex. anciens clients PWA en cache). Ne force
+# plus la langue attendue par Whisper, qui auto-détecte toujours la langue
+# parlée (voir app/services/transcription.py).
 LANGUAGE         = os.getenv("LANGUAGE", "fr")
 CHUNK_DURATION   = int(os.getenv("CHUNK_DURATION_SEC", 600))  # 10 min par chunk
 

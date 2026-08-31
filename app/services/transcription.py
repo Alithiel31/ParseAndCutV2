@@ -6,7 +6,7 @@ import time
 
 from groq import APIError, APITimeoutError
 
-from app.config import LANGUAGE, client, logger
+from app.config import client, logger
 
 
 def transcrire_chunk(path: str, retries: int = 2) -> tuple[str, list[dict]]:
@@ -14,6 +14,11 @@ def transcrire_chunk(path: str, retries: int = 2) -> tuple[str, list[dict]]:
     Transcrit un chunk audio via Groq Whisper.
     Retente automatiquement avec backoff exponentiel en cas de timeout.
     2 tentatives max pour rester dans le timeout serveur (300s).
+
+    La langue parlée est toujours auto-détectée par Whisper (language=None),
+    indépendamment de la langue de sortie choisie par l'utilisateur pour la
+    fiche générée (voir app.services.prompt) : ce sont deux réglages
+    indépendants.
 
     Retourne (texte_complet, segments) où segments est la liste des
     passages horodatés : [{"start": float, "end": float, "text": str}, ...]
@@ -25,7 +30,7 @@ def transcrire_chunk(path: str, retries: int = 2) -> tuple[str, list[dict]]:
                 result = client.audio.transcriptions.create(
                     file=(os.path.basename(path), f.read()),
                     model="whisper-large-v3",
-                    language=LANGUAGE,
+                    language=None,
                     response_format="verbose_json"
                 )
             # "segments" n'est pas un champ typé du modèle Transcription du SDK Groq
