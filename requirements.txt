@@ -6,7 +6,7 @@ uvicorn==0.52.3
 python-multipart==0.0.32
 
 # API Groq
-groq==1.6.0
+groq==1.7.0
 
 # Sécurisation des noms de fichiers (utilisé dans le code)
 werkzeug==3.1.8
