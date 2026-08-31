@@ -1,13 +1,15 @@
+import { useTranslation, type TranslationKey } from "../i18n";
+
 export interface Step {
   id: string;
-  label: string;
+  labelKey: TranslationKey;
 }
 
 export const STEPS: Step[] = [
-  { id: "step-upload", label: "📤 Envoi" },
-  { id: "step-cut", label: "✂️ Découpage" },
-  { id: "step-whisper", label: "🎙️ Transcription" },
-  { id: "step-llm", label: "🧠 Structuration" },
+  { id: "step-upload", labelKey: "steps.step-upload" },
+  { id: "step-cut", labelKey: "steps.step-cut" },
+  { id: "step-whisper", labelKey: "steps.step-whisper" },
+  { id: "step-llm", labelKey: "steps.step-llm" },
 ];
 
 interface ProgressStepsProps {
@@ -16,6 +18,7 @@ interface ProgressStepsProps {
 }
 
 export default function ProgressSteps({ activeId, done }: ProgressStepsProps) {
+  const { t } = useTranslation();
   const activeIdx = STEPS.findIndex((s) => s.id === activeId);
 
   return (
@@ -26,7 +29,7 @@ export default function ProgressSteps({ activeId, done }: ProgressStepsProps) {
         else if (idx === activeIdx) cls += " active";
         return (
           <span key={s.id} className={cls}>
-            {s.label}
+            {t(s.labelKey)}
           </span>
         );
       })}

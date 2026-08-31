@@ -1,16 +1,19 @@
 import { NavLink } from "react-router-dom";
+import { useTranslation } from "../i18n";
 
 export default function Footer() {
+  const { t } = useTranslation();
+
   return (
     <footer className="site-footer">
-      <nav aria-label="Informations légales">
-        <NavLink to="/mentions-legales">Mentions légales</NavLink>
+      <nav aria-label={t("footer.navLabel")}>
+        <NavLink to="/mentions-legales">{t("footer.legal")}</NavLink>
         <span aria-hidden="true">·</span>
-        <NavLink to="/politique-de-confidentialite">Confidentialité</NavLink>
+        <NavLink to="/politique-de-confidentialite">{t("footer.privacy")}</NavLink>
         <span aria-hidden="true">·</span>
-        <NavLink to="/cgu">CGU</NavLink>
+        <NavLink to="/cgu">{t("footer.terms")}</NavLink>
       </nav>
-      <p>Service gratuit et sans compte — aucun fichier n'est conservé.</p>
+      <p>{t("footer.tagline")}</p>
     </footer>
   );
 }

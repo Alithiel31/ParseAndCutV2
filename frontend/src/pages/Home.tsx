@@ -3,6 +3,7 @@ import DropZone from "../components/DropZone";
 import ProgressSteps, { STEPS } from "../components/ProgressSteps";
 import ResultView from "../components/ResultView";
 import { transcribeAudio, type TranscribeMode, type TranscribeResult } from "../api";
+import { useLanguage, useTranslation } from "../i18n";
 
 type Phase = "idle" | "loading" | "done" | "error";
 
@@ -16,6 +17,8 @@ export default function Home() {
   const [result, setResult] = useState<TranscribeResult | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const timers = useRef<number[]>([]);
+  const { t } = useTranslation();
+  const { lang } = useLanguage();
 
   useEffect(() => {
     if (phase === "done") {
@@ -30,20 +33,20 @@ export default function Home() {
 
   async function handleSubmit() {
     if (!file) {
-      setError("Sélectionnez d'abord un fichier audio.");
+      setError(t("home.errors.noFile"));
       return;
     }
     setError(null);
     setResult(null);
     setPhase("loading");
     setActiveStep(STEPS[0].id);
-    setStatusText("Envoi du fichier…");
+    setStatusText(t("home.status.uploading"));
 
     const stepTimings: [string, number, string][] = [
-      ["step-cut", 1500, "Découpage en cours…"],
-      ["step-whisper", 4000, "Transcription Whisper…"],
+      ["step-cut", 1500, t("home.status.cutting")],
+      ["step-whisper", 4000, t("home.status.whisper")],
       ...(mode === "summary"
-        ? ([["step-llm", 9000, "Structuration par l'IA…"]] as [string, number, string][])
+        ? ([["step-llm", 9000, t("home.status.structuring")]] as [string, number, string][])
         : []),
     ];
     timers.current = stepTimings.map(([id, delay, label]) =>
@@ -54,14 +57,14 @@ export default function Home() {
     );
 
     try {
-      const data = await transcribeAudio(file, mode);
+      const data = await transcribeAudio(file, mode, lang);
       clearTimers();
       setResult(data);
-      setStatusText(mode === "summary" ? "✅ Fiche générée !" : "✅ Transcription terminée !");
+      setStatusText(mode === "summary" ? t("home.status.summaryDone") : t("home.status.transcriptDone"));
       setPhase("done");
     } catch (e) {
       clearTimers();
-      setError(e instanceof Error ? e.message : "Erreur inconnue");
+      setError(e instanceof Error ? e.message : t("home.errors.unknown"));
       setPhase("error");
     }
   }
@@ -78,13 +81,15 @@ export default function Home() {
           }}
           onError={setError}
           selectedFileLabel={
-            file ? `📎 ${file.name} — ${(file.size / 1024 / 1024).toFixed(1)} Mo` : ""
+            file
+              ? t("home.selectedFile", { name: file.name, size: (file.size / 1024 / 1024).toFixed(1) })
+              : ""
           }
         />
 
         {error && <div className="error-banner">⚠️ {error}</div>}
 
-        <div className="mode-selector" role="radiogroup" aria-label="Type de résultat">
+        <div className="mode-selector" role="radiogroup" aria-label={t("home.modeSelector.label")}>
           <label className={`mode-option${mode === "summary" ? " active" : ""}`}>
             <input
               type="radio"
@@ -93,7 +98,7 @@ export default function Home() {
               checked={mode === "summary"}
               onChange={() => setMode("summary")}
             />
-            <span>🧠 Résumé IA</span>
+            <span>{t("home.mode.summary")}</span>
           </label>
           <label className={`mode-option${mode === "transcript" ? " active" : ""}`}>
             <input
@@ -103,12 +108,12 @@ export default function Home() {
               checked={mode === "transcript"}
               onChange={() => setMode("transcript")}
             />
-            <span>📄 Transcription basique</span>
+            <span>{t("home.mode.transcript")}</span>
           </label>
         </div>
 
         <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
-          {mode === "summary" ? "🚀 Générer la fiche de révision" : "🚀 Transcrire l'audio"}
+          {mode === "summary" ? t("home.submit.summary") : t("home.submit.transcript")}
         </button>
       </div>
 
