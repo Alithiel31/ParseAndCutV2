@@ -1,7 +1,10 @@
 import { useRef, useState, type DragEvent, type ChangeEvent } from "react";
 import { useTranslation } from "../i18n";
 
-const MAX_SIZE_MB = 300;
+// Alignée sur le plafond réel de Cloudflare (100 Mo sur les plans Free/Pro) :
+// un fichier plus gros passe la validation ici mais reste bloqué en silence
+// par le proxy avant même d'atteindre le backend.
+const MAX_SIZE_MB = 100;
 
 interface DropZoneProps {
   onFileSelected: (file: File) => void;

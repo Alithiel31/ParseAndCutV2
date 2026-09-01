@@ -56,11 +56,13 @@ Ce projet couvre, de bout en bout :
 | 🧠 Fiche structurée | Résumé, titres hiérarchiques, mots-clés en gras, blocs définition |
 | 🔀 Deux modes de sortie | Résumé IA ou transcription brute au choix, par upload — le mode transcription saute entièrement l'appel LLM, et fournit des horodatages par segment |
 | 🌐 Interface moderne | Drag & drop, barre de progression par étape, affichage des stats |
-| ✅ Validation robuste | Vérification type + taille côté client ET serveur |
+| 🇫🇷🇬🇧 Interface FR/EN | Sélecteur de langue (en-tête), traduit tout le parcours et les pages légales ; pilote aussi la langue de sortie du prompt de structuration LLM — indépendant de Whisper, qui auto-détecte toujours la langue parlée |
+| 🔔 Notifications locales | Case à cocher « me notifier à la fin » — prévient l'appareil via le service worker une fois la transcription terminée, utile si l'onglet est en arrière-plan |
+| ✅ Validation robuste | Vérification type + taille côté client ET serveur (100 Mo max — plafond propre au proxy Cloudflare sur Free/Pro, voir [`docs/Troubleshooting.fr.md`](./docs/Troubleshooting.fr.md)) |
 | 🔁 Retry automatique | Relance Whisper en cas de timeout réseau (backoff exponentiel) |
 | 🐳 Docker ready | FFmpeg + Uvicorn pré-configurés, image légère `python:3.10-slim` |
-| 📊 Endpoint `/health` | Monitoring : état Groq, langue, extensions supportées |
-| ⚖️ Pages légales | CGU, politique de confidentialité et mentions légales servies par le PWA (`/cgu`, `/politique-de-confidentialite`, `/mentions-legales`) |
+| 📊 Endpoint `/health` | Monitoring : état Groq, langue de sortie par défaut, extensions supportées |
+| ⚖️ Pages légales | CGU, politique de confidentialité et mentions légales servies par le PWA (`/cgu`, `/politique-de-confidentialite`, `/mentions-legales`), chacune en français et en anglais |
 
 ## Formats audio supportés
 
@@ -96,12 +98,12 @@ Nginx (conteneur frontend) sert les fichiers statiques du PWA et reverse-proxy `
 | Variable | Obligatoire | Défaut | Description |
 |---|---|---|---|
 | `GROQ_API_KEY` | ✅ | — | Clé API Groq ([console.groq.com](https://console.groq.com/)) |
-| `LANGUAGE` | ❌ | `fr` | Langue de transcription Whisper |
+| `LANGUAGE` | ❌ | `fr` | Langue de sortie par défaut (`fr`/`en`) si une requête omet `lang` — ne force **pas** la langue attendue par Whisper, qui auto-détecte toujours |
 | `PORT` | ❌ | `5000` | Port d'écoute du backend |
 | `CHUNK_DURATION_SEC` | ❌ | `600` | Durée des chunks en secondes |
 | `FFMPEG_PATH` | ❌ | `ffmpeg` | Chemin vers le binaire FFmpeg |
 | `CORS_ORIGINS` | ❌ | `https://parseandcut.alithiel31.dev` | Origines autorisées séparées par des virgules — à surcharger en dev local (Vite sur `:5173` qui tape sur Uvicorn sur `:5000`) |
-| `MAX_UPLOAD_SIZE_MB` | ❌ | `300` | Taille max d'upload vérifiée côté backend (en plus du `client_max_body_size` de nginx) |
+| `MAX_UPLOAD_SIZE_MB` | ❌ | `100` | Taille max d'upload vérifiée côté backend (en plus du `client_max_body_size` de nginx) — aligné sur le plafond du proxy Cloudflare sur les plans Free/Pro |
 | `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Limite de requêtes sur `/process` (par IP), format `N/period` |
 | `FLASK_DEBUG` | ❌ | `false` | Mode debug (dev uniquement) |
 

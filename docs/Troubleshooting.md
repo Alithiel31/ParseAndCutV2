@@ -57,6 +57,44 @@ On the current Docker/Pi deployment, `GROQ_API_KEY` is read from the local `.env
 
 ---
 
+## 2. Large uploads (>100 MB) hang indefinitely behind Cloudflare
+
+### Symptom
+
+Uploading a large audio file (e.g. 174 MB) through the public domain
+(`parseandcut.alithiel31.dev`, behind Cloudflare Tunnel) leaves the UI stuck on the "Transcription
+Whisper…" step indefinitely. `docker compose logs -f backend` never shows a `📥 Fichier reçu` line
+for that request, and `docker compose logs -f frontend` (nginx access log) never shows the
+matching `POST /api/transcribe` either — the request never reaches the Pi at all. A small file
+(a few MB) through the exact same code path completes normally in a few seconds.
+
+### Root cause
+
+Cloudflare enforces its own maximum request body size for any traffic proxied through its edge —
+Tunnel included, since a Tunnel has no public IP to bypass the proxy with a DNS-only record. That
+ceiling is **100 MB on Free and Pro plans**, 200 MB on Business, 500 MB+ on Enterprise (see
+[Cloudflare's upload limits docs](https://developers.cloudflare.com/cache/concepts/default-cache-behavior/#upload-limits)).
+Before this was diagnosed, `MAX_UPLOAD_SIZE_MB` (backend) and the frontend's own size check had
+both been raised to 300 MB, letting users pick and start uploading files Cloudflare would then
+silently drop before they ever reached nginx or the backend — with no error surfaced to the user,
+just an indefinitely spinning progress indicator.
+
+### What resolved it
+
+`MAX_UPLOAD_SIZE_MB` and the frontend's `MAX_SIZE_MB` were both brought back down to **100 MB**,
+matching the actual Cloudflare Free/Pro ceiling, so oversized files are rejected immediately with
+a clear error instead of silently hanging.
+
+### Note for the current deployment
+
+Nginx's own `client_max_body_size` (500 MB, `frontend/nginx.conf`) is deliberately left higher —
+it isn't the binding constraint here and doesn't need to track Cloudflare's limit. If a higher
+upload ceiling is ever needed, the only real options are upgrading the Cloudflare plan (Business →
+200 MB) or splitting the upload into smaller chunks client-side; unproxying the domain (DNS-only)
+is not compatible with Cloudflare Tunnel.
+
+---
+
 ## Reporting a new problem
 
 If your issue is not the one documented above, open an issue using the provided template. Include the relevant logs (`docker logs <container>` in prod, console output locally) and never paste a real `GROQ_API_KEY` value.

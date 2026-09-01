@@ -57,6 +57,48 @@ Sur le déploiement Docker/Pi actuel, `GROQ_API_KEY` est lu depuis le fichier `.
 
 ---
 
+## 2. Les gros uploads (>100 Mo) restent bloqués indéfiniment derrière Cloudflare
+
+### Symptôme
+
+Uploader un gros fichier audio (ex. 174 Mo) via le domaine public
+(`parseandcut.alithiel31.dev`, derrière le tunnel Cloudflare) laisse l'interface bloquée
+indéfiniment sur l'étape « Transcription Whisper… ». `docker compose logs -f backend` n'affiche
+jamais de ligne `📥 Fichier reçu` pour cette requête, et `docker compose logs -f frontend` (log
+d'accès nginx) n'affiche pas non plus le `POST /api/transcribe` correspondant — la requête
+n'atteint jamais le Pi. Un petit fichier (quelques Mo) sur exactement le même chemin de code
+aboutit normalement en quelques secondes.
+
+### Root cause
+
+Cloudflare impose sa propre taille maximale de requête pour tout le trafic qui transite par son
+edge — tunnel inclus, puisqu'un tunnel n'a pas d'IP publique permettant de contourner le proxy via
+un enregistrement DNS-only. Ce plafond est de **100 Mo sur les plans Free et Pro**, 200 Mo sur
+Business, 500 Mo+ sur Enterprise (voir la
+[doc Cloudflare sur les limites d'upload](https://developers.cloudflare.com/cache/concepts/default-cache-behavior/#upload-limits)).
+Avant ce diagnostic, `MAX_UPLOAD_SIZE_MB` (backend) et la vérification de taille côté frontend
+avaient toutes deux été relevées à 300 Mo, laissant les utilisateurs sélectionner et commencer à
+uploader des fichiers que Cloudflare bloquait ensuite silencieusement avant même qu'ils
+n'atteignent nginx ou le backend — sans aucune erreur affichée, juste un indicateur de progression
+qui tourne indéfiniment.
+
+### Ce qui a résolu le problème
+
+`MAX_UPLOAD_SIZE_MB` et le `MAX_SIZE_MB` côté frontend ont tous les deux été ramenés à **100 Mo**,
+alignés sur le vrai plafond Cloudflare Free/Pro, pour que les fichiers trop volumineux soient
+rejetés immédiatement avec une erreur claire plutôt que de rester bloqués en silence.
+
+### Point de vigilance pour l'hébergement actuel
+
+Le `client_max_body_size` de nginx (500 Mo, `frontend/nginx.conf`) est volontairement laissé plus
+haut — ce n'est pas lui la contrainte bloquante ici, il n'a pas besoin de suivre la limite
+Cloudflare. Si un plafond d'upload plus élevé devient nécessaire un jour, les seules vraies options
+sont de monter en gamme sur Cloudflare (Business → 200 Mo) ou de découper l'upload en plusieurs
+morceaux côté client ; désactiver le proxy Cloudflare (DNS-only) n'est pas compatible avec un
+tunnel Cloudflare.
+
+---
+
 ## Signaler un nouveau problème
 
 Si votre incident n'est pas celui documenté ci-dessus, ouvrez une issue en suivant le template fourni. Incluez les logs pertinents (`docker logs <container>` en prod, sortie console en local) et ne collez jamais de vraie valeur de `GROQ_API_KEY`.
