@@ -21,7 +21,7 @@ export default function Cgu() {
       </p>
       <ul>
         <li>Formats acceptés : mp3, mp4, wav, m4a, ogg, webm, flac, aac, opus.</li>
-        <li>Taille maximale : 100 Mo par fichier.</li>
+        <li>Taille maximale : 300 Mo par fichier.</li>
         <li>Le fichier est découpé en segments de dix minutes avant traitement.</li>
         <li>
           La transcription et la mise en forme sont réalisées par des modèles d'intelligence

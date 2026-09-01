@@ -1,6 +1,6 @@
 import { useRef, useState, type DragEvent, type ChangeEvent } from "react";
 
-const MAX_SIZE_MB = 100;
+const MAX_SIZE_MB = 300;
 
 interface DropZoneProps {
   onFileSelected: (file: File) => void;
