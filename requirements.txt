@@ -12,7 +12,7 @@ groq==1.6.0
 werkzeug==3.1.8
 
 # Rate limiting sur /process (protection anti-abus des crédits Groq)
-slowapi==0.1.9
+slowapi==0.1.10
 
 # Variables d'environnement
 python-dotenv==1.2.3
