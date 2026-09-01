@@ -56,11 +56,13 @@ This project covers, end to end:
 | 🧠 Structured notes | Summary, hierarchical headings, bold keywords, definition blocks |
 | 🔀 Two output modes | Pick AI summary or raw transcript per upload — transcript mode skips the LLM call entirely, and comes with per-segment timestamps |
 | 🌐 Modern UI | Drag & drop, step-by-step progress bar, processing stats |
-| ✅ Robust validation | File type + size checked both client-side and server-side |
+| 🇫🇷🇬🇧 French/English UI | Language switcher (header), translates the whole flow and the legal pages; drives the LLM structuring prompt's output language too — independent of Whisper, which always auto-detects the spoken language |
+| 🔔 Local notifications | Opt-in "notify me when done" — pings the device via the service worker once a transcription finishes, useful when the tab is backgrounded |
+| ✅ Robust validation | File type + size checked both client-side and server-side (100 MB max — Cloudflare's own proxy ceiling on Free/Pro, see [`docs/Troubleshooting.md`](./docs/Troubleshooting.md)) |
 | 🔁 Auto retry | Whisper retried on network timeout with exponential backoff |
 | 🐳 Docker ready | FFmpeg + Uvicorn pre-configured, lightweight `python:3.10-slim` image |
-| 📊 `/health` endpoint | Monitoring: Groq status, language, supported formats |
-| ⚖️ Legal pages | Terms, privacy policy and legal notice served by the PWA (`/cgu`, `/politique-de-confidentialite`, `/mentions-legales`) |
+| 📊 `/health` endpoint | Monitoring: Groq status, default output language, supported formats |
+| ⚖️ Legal pages | Terms, privacy policy and legal notice served by the PWA (`/cgu`, `/politique-de-confidentialite`, `/mentions-legales`), each in French and English |
 
 ## Supported audio formats
 
@@ -96,12 +98,12 @@ Nginx (frontend container) serves the PWA static files and reverse-proxies `/api
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `GROQ_API_KEY` | ✅ | — | Groq API key ([console.groq.com](https://console.groq.com/)) |
-| `LANGUAGE` | ❌ | `fr` | Whisper transcription language |
+| `LANGUAGE` | ❌ | `fr` | Default output language (`fr`/`en`) used when a request omits `lang` — does **not** force Whisper's input language, which always auto-detects |
 | `PORT` | ❌ | `5000` | Port the backend listens on |
 | `CHUNK_DURATION_SEC` | ❌ | `600` | Chunk duration in seconds |
 | `FFMPEG_PATH` | ❌ | `ffmpeg` | Path to the FFmpeg binary |
 | `CORS_ORIGINS` | ❌ | `https://parseandcut.alithiel31.dev` | Comma-separated allowed origins — override for local dev (Vite on `:5173` calling Uvicorn on `:5000`) |
-| `MAX_UPLOAD_SIZE_MB` | ❌ | `300` | Max upload size enforced by the backend (in addition to nginx's `client_max_body_size`) |
+| `MAX_UPLOAD_SIZE_MB` | ❌ | `100` | Max upload size enforced by the backend (in addition to nginx's `client_max_body_size`) — matches Cloudflare's own proxy ceiling on Free/Pro plans |
 | `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Rate limit on `/process` (per IP), format `N/period` |
 | `FLASK_DEBUG` | ❌ | `false` | Debug mode (dev only) |
 

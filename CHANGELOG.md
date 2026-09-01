@@ -7,12 +7,26 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 
 ### Added
 
+- French/English UI language support: a `lang` field (`fr`/`en`, default `fr`) on `/process` and
+  `/api/transcribe` drives the LLM structuring prompt's output language and the localized HTTP
+  error messages (`app/i18n.py`); Whisper transcription now always auto-detects the spoken
+  language (`language=None`), decoupled from the requested output language. The frontend gets a
+  language switcher (header, persisted in `localStorage`, defaults to the browser's language on
+  first visit) translating the whole UI, including the CGU/privacy policy/legal notice pages
+- Local notifications: an opt-in "notify me when done" checkbox on the home page triggers a
+  device notification via `ServiceWorkerRegistration.showNotification()` once a transcription
+  finishes — useful if the tab is backgrounded or the screen is locked while waiting. No server
+  push/VAPID/subscription storage involved, purely client-side
 - Rate limiting on `/process` and `/api/transcribe` (`slowapi`, default `5/minute` per IP,
   configurable via `RATE_LIMIT_PROCESS`) to protect Groq API credits and the Raspberry Pi from
   anonymous abuse
-- Explicit server-side upload size limit (`MAX_UPLOAD_SIZE_MB`, default 300), enforced by
+- Explicit server-side upload size limit (`MAX_UPLOAD_SIZE_MB`, default 100), enforced by
   streaming the upload to disk in chunks and aborting past the limit — previously only nginx's
-  `client_max_body_size` (500 MB) bounded upload size
+  `client_max_body_size` (500 MB) bounded upload size. The 100 MB default matches Cloudflare's own
+  request size ceiling on Free/Pro plans for traffic proxied through it (Tunnel included): a
+  larger file is silently dropped by Cloudflare before ever reaching the Pi, so a more permissive
+  backend/nginx limit only delays the failure instead of preventing it — see
+  [`docs/Troubleshooting.md`](./docs/Troubleshooting.md)
 - `.github/dependabot.yml`: weekly dependency update PRs for pip, npm (root and `frontend/`)
   and GitHub Actions
 - `docs/SECURITY.md` / `docs/SECURITY.fr.md`: vulnerability disclosure policy
@@ -23,6 +37,9 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 - `CORS_ORIGINS` now defaults to `https://parseandcut.alithiel31.dev` instead of `*` — the
   wildcard let any third-party site's JavaScript call the public API directly through visitors'
   browsers; local dev still overrides it to the Vite origin
+- `LANGUAGE` env var now means the *default output language* used when a request omits `lang`
+  (e.g. an old cached PWA client), not the language forced onto Whisper's transcription
+- `/health`'s `language` field renamed to `default_language` to match `LANGUAGE`'s new meaning
 
 ## [1.1.0] - 2026-08-17
 
