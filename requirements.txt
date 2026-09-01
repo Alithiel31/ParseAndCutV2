@@ -15,7 +15,7 @@ werkzeug==3.1.8
 slowapi==0.1.9
 
 # Variables d'environnement
-python-dotenv==1.2.2
+python-dotenv==1.2.3
 
 flake8==7.3.0
 
