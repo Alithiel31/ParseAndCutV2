@@ -16,4 +16,5 @@ class TestHealthRoute:
         data = resp.json()
         assert data["status"] == "ok"
         assert "groq_ready" in data
+        assert "default_language" in data
         assert "allowed_extensions" in data

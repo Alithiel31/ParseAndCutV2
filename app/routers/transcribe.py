@@ -13,7 +13,8 @@ from fastapi.responses import JSONResponse
 from groq import APIError
 from werkzeug.utils import secure_filename
 
-from app.config import CHUNK_DURATION, MAX_UPLOAD_SIZE_MB, RATE_LIMIT_PROCESS, client, logger
+from app.config import CHUNK_DURATION, LANGUAGE, MAX_UPLOAD_SIZE_MB, RATE_LIMIT_PROCESS, client, logger
+from app.i18n import SUPPORTED_LANGS, t
 from app.limiter import limiter
 from app.services.audio import allowed_file, découper_audio, obtenir_duree_audio, ALLOWED_EXTENSIONS
 from app.services.prompt import construire_prompt
@@ -25,7 +26,7 @@ _UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1 Mo par bloc de copie
 MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 
-def _sauvegarder_avec_limite(source, destination_path: str, max_bytes: int) -> None:
+def _sauvegarder_avec_limite(source, destination_path: str, max_bytes: int, lang: str) -> None:
     """Copie `source` (UploadFile.file) vers `destination_path` par blocs, en
     interrompant et en supprimant le fichier partiel si `max_bytes` est dépassé."""
     total = 0
@@ -40,7 +41,7 @@ def _sauvegarder_avec_limite(source, destination_path: str, max_bytes: int) -> N
                 os.remove(destination_path)
                 raise HTTPException(
                     status_code=413,
-                    detail=f"Fichier trop volumineux (max {MAX_UPLOAD_SIZE_MB} Mo)"
+                    detail=t("file_too_large", lang, max_mb=MAX_UPLOAD_SIZE_MB)
                 )
             f.write(block)
 
@@ -56,22 +57,32 @@ def _formater_horodatage(secondes: float) -> str:
 @router.post('/process')
 @router.post('/api/transcribe')  # alias explicite pour les clients API/PWA
 @limiter.limit(RATE_LIMIT_PROCESS)
-def process(request: Request, audio: Optional[UploadFile] = File(None), mode: str = Form("summary")):
+def process(
+    request: Request,
+    audio: Optional[UploadFile] = File(None),
+    mode: str = Form("summary"),
+    lang: str = Form(LANGUAGE),
+):
 
     # --- Vérifications préalables ---
+    # `lang` est validé en premier : tous les messages d'erreur suivants
+    # doivent être dans une langue confirmée.
+    if lang not in SUPPORTED_LANGS:
+        raise HTTPException(status_code=400, detail=t("invalid_lang", lang))
+
     if not client:
-        raise HTTPException(status_code=503, detail="Configuration API Groq manquante sur le serveur")
+        raise HTTPException(status_code=503, detail=t("groq_not_configured", lang))
 
     if audio is None or not audio.filename:
-        raise HTTPException(status_code=400, detail="Aucun fichier audio reçu")
+        raise HTTPException(status_code=400, detail=t("no_audio_file", lang))
 
     if mode not in ("summary", "transcript"):
-        raise HTTPException(status_code=400, detail="Mode invalide (attendu : 'summary' ou 'transcript')")
+        raise HTTPException(status_code=400, detail=t("invalid_mode", lang))
 
     if not allowed_file(audio.filename):
         raise HTTPException(
             status_code=415,
-            detail=f"Format non supporté. Formats acceptés : {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+            detail=t("unsupported_format", lang, formats=", ".join(sorted(ALLOWED_EXTENSIONS)))
         )
 
     # --- Sauvegarde sécurisée ---
@@ -90,7 +101,7 @@ def process(request: Request, audio: Optional[UploadFile] = File(None), mode: st
     chunks_créés  = []
 
     try:
-        _sauvegarder_avec_limite(audio.file, input_path, MAX_UPLOAD_SIZE_BYTES)
+        _sauvegarder_avec_limite(audio.file, input_path, MAX_UPLOAD_SIZE_BYTES, lang)
         size_mo = os.path.getsize(input_path) / 1024 / 1024
         logger.info(f"📥 Fichier reçu : {filename} ({size_mo:.1f} Mo)")
 
@@ -107,7 +118,7 @@ def process(request: Request, audio: Optional[UploadFile] = File(None), mode: st
         if not chunks_créés:
             raise HTTPException(
                 status_code=422,
-                detail="Impossible de traiter le fichier audio (vide, corrompu, ou format non lisible par FFmpeg)"
+                detail=t("ffmpeg_unreadable", lang)
             )
 
         logger.info(f"✅ {len(chunks_créés)} chunk(s) prêts à transcrire")
@@ -134,7 +145,7 @@ def process(request: Request, audio: Optional[UploadFile] = File(None), mode: st
         if not texte_complet.strip():
             raise HTTPException(
                 status_code=422,
-                detail="Transcription vide — audio silencieux, inaudible ou langue incorrecte ?"
+                detail=t("transcription_empty", lang)
             )
 
         logger.info(f"✅ Transcription complète : {len(texte_complet):,} caractères")
@@ -152,7 +163,7 @@ def process(request: Request, audio: Optional[UploadFile] = File(None), mode: st
             logger.info("🧠 Structuration par IA...")
             completion = client.chat.completions.create(
                 model="openai/gpt-oss-120b",
-                messages=[{"role": "user", "content": construire_prompt(texte_complet)}],
+                messages=[{"role": "user", "content": construire_prompt(texte_complet, lang)}],
                 temperature=0.4,
                 max_tokens=4096
             )
@@ -191,19 +202,19 @@ def process(request: Request, audio: Optional[UploadFile] = File(None), mode: st
 
     except subprocess.TimeoutExpired:
         logger.error("FFmpeg timeout global")
-        raise HTTPException(status_code=504, detail="Le découpage audio a pris trop de temps")
+        raise HTTPException(status_code=504, detail=t("ffmpeg_timeout", lang))
 
     except RuntimeError as e:
         logger.error(f"Erreur transcription: {e}")
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=t("transcription_error", lang, error=str(e)))
 
     except APIError as e:
         logger.error(f"Erreur API Groq: {e}")
-        raise HTTPException(status_code=502, detail=f"Erreur API Groq : {e.message}")
+        raise HTTPException(status_code=502, detail=t("groq_api_error", lang, error=e.message))
 
     except Exception:
         logger.exception("Erreur inattendue dans /process")
-        raise HTTPException(status_code=500, detail="Erreur interne du serveur")
+        raise HTTPException(status_code=500, detail=t("internal_error", lang))
 
     finally:
         # Nettoyage garanti même en cas d'exception à mi-parcours

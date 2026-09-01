@@ -1,4 +1,8 @@
 <!doctype html>
+<!-- lang/title/description ci-dessous = repli pré-hydratation (SPA sans SSR) ;
+     App.tsx (via src/i18n/) prend le relais au runtime selon la langue
+     stockée/détectée et peut les surcharger (document.documentElement.lang,
+     <title>/<meta description> hoistés par React 19). -->
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />

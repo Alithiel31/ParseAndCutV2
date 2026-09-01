@@ -1,17 +1,21 @@
+import { useTranslation } from "../i18n";
+
 interface UpdateBannerProps {
   onUpdate: () => void;
   onDismiss: () => void;
 }
 
 export default function UpdateBanner({ onUpdate, onDismiss }: UpdateBannerProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="update-banner">
-      <span>🔄 Une nouvelle version est disponible.</span>
+      <span>{t("updateBanner.text")}</span>
       <button className="btn-secondary" onClick={onUpdate}>
-        Mettre à jour
+        {t("updateBanner.update")}
       </button>
       <button className="btn-secondary" onClick={onDismiss}>
-        Plus tard
+        {t("updateBanner.later")}
       </button>
     </div>
   );

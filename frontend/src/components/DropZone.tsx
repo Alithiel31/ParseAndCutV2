@@ -1,4 +1,5 @@
 import { useRef, useState, type DragEvent, type ChangeEvent } from "react";
+import { useTranslation } from "../i18n";
 
 const MAX_SIZE_MB = 300;
 
@@ -11,11 +12,12 @@ interface DropZoneProps {
 export default function DropZone({ onFileSelected, onError, selectedFileLabel }: DropZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const { t } = useTranslation();
 
   function handleFile(file: File | undefined) {
     if (!file) return;
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      onError(`Fichier trop volumineux (max ${MAX_SIZE_MB} Mo).`);
+      onError(t("dropzone.tooLarge", { maxMb: MAX_SIZE_MB }));
       return;
     }
     onFileSelected(file);
@@ -44,7 +46,7 @@ export default function DropZone({ onFileSelected, onError, selectedFileLabel }:
         onDrop={onDrop}
       >
         <span className="icon">☁️</span>
-        <span className="text">Glissez votre fichier audio ici ou cliquez pour choisir</span>
+        <span className="text">{t("dropzone.hint")}</span>
         <input
           ref={inputRef}
           type="file"

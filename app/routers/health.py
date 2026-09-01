@@ -12,7 +12,7 @@ def health():
     return HealthResponse(
         status="ok",
         groq_ready=client is not None,
-        language=LANGUAGE,
+        default_language=LANGUAGE,
         chunk_duration_sec=CHUNK_DURATION,
         allowed_extensions=sorted(ALLOWED_EXTENSIONS)
     )

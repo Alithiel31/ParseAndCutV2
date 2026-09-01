@@ -1,3 +1,6 @@
+import type { Lang } from "./i18n";
+import { translate } from "./i18n";
+
 export type TranscribeMode = "summary" | "transcript";
 
 export interface TranscribeStats {
@@ -23,11 +26,13 @@ export class ApiError extends Error {}
 
 export async function transcribeAudio(
   file: File,
-  mode: TranscribeMode = "summary"
+  mode: TranscribeMode = "summary",
+  lang: Lang = "fr"
 ): Promise<TranscribeResult> {
   const formData = new FormData();
   formData.append("audio", file);
   formData.append("mode", mode);
+  formData.append("lang", lang);
 
   const response = await fetch(`${API_URL}/api/transcribe`, {
     method: "POST",
@@ -35,10 +40,13 @@ export async function transcribeAudio(
   });
 
   if (!response.ok) {
+    // Repli local (pas un composant, donc pas de useTranslation()) utilisé
+    // uniquement quand le backend n'a pas pu renvoyer de `detail` traduit
+    // (ex. réponse non-JSON).
     const err = await response
       .json()
-      .catch(() => ({ detail: `Erreur HTTP ${response.status}` }));
-    throw new ApiError(err.detail || `Erreur ${response.status}`);
+      .catch(() => ({ detail: translate(lang, "api.httpError", { status: response.status }) }));
+    throw new ApiError(err.detail || translate(lang, "api.genericError", { status: response.status }));
   }
 
   return response.json();
