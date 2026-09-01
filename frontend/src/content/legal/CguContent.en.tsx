@@ -22,7 +22,7 @@ export default function CguContentEn() {
       </p>
       <ul>
         <li>Accepted formats: mp3, mp4, wav, m4a, ogg, webm, flac, aac, opus.</li>
-        <li>Maximum size: 100 MB per file.</li>
+        <li>Maximum size: 300 MB per file.</li>
         <li>The file is split into ten-minute segments before processing.</li>
         <li>
           Transcription and formatting are performed by artificial intelligence models operated
