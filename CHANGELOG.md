@@ -5,6 +5,8 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-01
+
 ### Added
 
 - French/English UI language support: a `lang` field (`fr`/`en`, default `fr`) on `/process` and
