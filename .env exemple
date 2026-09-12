@@ -1,5 +1,5 @@
-# Clé API obtenue sur https://console.groq.com/
-GROQ_API_KEY=
+# GROQ_API_KEY est géré par Infisical (projet Shared Keys, clé partagée
+# entre plusieurs services) — voir deploy.sh, pas besoin de la définir ici.
 
 # Langue de sortie par défaut (fr ou en) si une requête n'envoie pas le
 # champ `lang` (ex. anciens clients PWA en cache). Whisper auto-détecte

@@ -21,8 +21,11 @@ docker info   # doit afficher l'OS/l'arch du Pi
 Depuis ce dossier (`ParseAndCutV2`), avec le context `rpi` actif :
 
 ```bash
-docker compose up --build -d
+docker compose build
+bash deploy.sh
 ```
+
+`deploy.sh` récupère `GROQ_API_KEY` depuis Infisical (voir section 4) et lance `docker compose up -d` avec cette variable injectée.
 
 Docker envoie le contexte de build (fichiers locaux de `app/` et `frontend/`) au démon
 distant du Pi — pas besoin de cloner quoi que ce soit sur le Pi. Le frontend est routé via
@@ -62,6 +65,8 @@ passe bien à travers le proxy nginx → backend.
 
 ## 4. Variables d'environnement
 
-Le backend lit `.env` (déjà présent dans ce repo, non versionné) : `GROQ_API_KEY`,
-`LANGUAGE`, `CHUNK_DURATION_SEC`, etc. Rien à changer pour le déploiement Pi, à part
-vérifier que `GROQ_API_KEY` y est bien renseigné.
+Le backend lit deux sources :
+- `.env` (présent dans ce repo, non versionné) pour la config non-sensible : `LANGUAGE`, `PORT`, `CORS_ORIGINS`, etc.
+- `GROQ_API_KEY`, gérée par Infisical (projet **Shared Keys**, environnements Development/Production synchronisés) — récupérée automatiquement par `deploy.sh` via la Machine Identity dédiée `parseandcut-deploy` (rôle Viewer). Voir `.infisical-identity.env.example` pour configurer les identifiants de cette Machine Identity si besoin de redéployer depuis une nouvelle machine.
+
+Rien à changer manuellement pour un déploiement normal : `bash deploy.sh` s'occupe de tout.

@@ -6,6 +6,8 @@ services:
       context: .
     env_file:
       - .env
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
     restart: unless-stopped
 
   frontend:

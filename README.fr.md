@@ -107,6 +107,8 @@ Nginx (conteneur frontend) sert les fichiers statiques du PWA et reverse-proxy `
 | `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Limite de requêtes sur `/process` (par IP), format `N/period` |
 | `FLASK_DEBUG` | ❌ | `false` | Mode debug (dev uniquement) |
 
+> **Note production :** sur le déploiement Caesura, `GROQ_API_KEY` n'est pas lue depuis `.env` — elle est injectée au déploiement via Infisical (voir `docs/DEPLOY_PI.md`). Pour le développement local, renseigne-la directement dans ton `.env` comme décrit ci-dessous.
+
 ## Installation locale
 
 1. **Cloner le dépôt**
@@ -148,7 +150,8 @@ C'est la méthode utilisée en production. Le `docker-compose.yml` de ce dépôt
 
 ```bash
 docker context use rpi
-docker compose up --build -d
+docker compose build
+bash deploy.sh
 ```
 
 L'endpoint [`/health`](https://parseandcut.alithiel31.dev/api/health) permet de vérifier l'état du service à tout moment.

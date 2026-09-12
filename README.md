@@ -107,6 +107,8 @@ Nginx (frontend container) serves the PWA static files and reverse-proxies `/api
 | `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Rate limit on `/process` (per IP), format `N/period` |
 | `FLASK_DEBUG` | ❌ | `false` | Debug mode (dev only) |
 
+> **Production note:** on the Caesura deployment, `GROQ_API_KEY` is not read from `.env` — it's injected at deploy time via Infisical (see `docs/DEPLOY_PI.md`). For local development, set it directly in your `.env` as described below.
+
 ## Local setup
 
 1. **Clone the repository**
@@ -148,7 +150,8 @@ This is the production setup. This repo's `docker-compose.yml` runs the backend 
 
 ```bash
 docker context use rpi
-docker compose up --build -d
+docker compose build
+bash deploy.sh
 ```
 
 Check the [`/health`](https://parseandcut.alithiel31.dev/api/health) endpoint anytime to verify service status.
