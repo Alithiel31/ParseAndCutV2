@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'twa-parseandcut/**'
+      - 'frontend/twa-parseandcut/**'
 
 jobs:
   build:
@@ -30,7 +30,7 @@ jobs:
 
       - name: Decode Keystore
         run: |
-                echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d ' \n\r' | base64 --decode > twa-parseandcut/android.keystore
+                echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d ' \n\r' | base64 --decode > frontend/twa-parseandcut/android.keystore
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
@@ -42,11 +42,11 @@ jobs:
       - name: Set versionCode
         run: |
           VERSION_CODE=$(git rev-list --count HEAD)
-          sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" twa-parseandcut/app/build.gradle
+          sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" frontend/twa-parseandcut/app/build.gradle
           echo "versionCode → $VERSION_CODE"
 
       - name: Build AAB
-        working-directory: twa-parseandcut
+        working-directory: frontend/twa-parseandcut
         env:
           KSPASS: ${{ secrets.KEYSTORE_PASSWORD }}
           KPASS: ${{ secrets.KEY_PASSWORD }}
@@ -66,5 +66,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: parseandcut-release
-          path: twa-parseandcut/app-release-bundle.aab
+          path: frontend/twa-parseandcut/app-release-bundle.aab
           retention-days: 30
