@@ -44,10 +44,10 @@ desktop.ini
 *.sw?
 
 # Android / TWA (Bubblewrap)
-twa-parseandcut/*.keystore
-twa-parseandcut/local.properties
-twa-parseandcut/.gradle/
-twa-parseandcut/build/
-twa-parseandcut/app/build/
-twa-parseandcut/*.apk
-twa-parseandcut/*.aab
+frontend/twa-parseandcut/*.keystore
+frontend/twa-parseandcut/local.properties
+frontend/twa-parseandcut/.gradle/
+frontend/twa-parseandcut/build/
+frontend/twa-parseandcut/app/build/
+frontend/twa-parseandcut/*.apk
+frontend/twa-parseandcut/*.aab
