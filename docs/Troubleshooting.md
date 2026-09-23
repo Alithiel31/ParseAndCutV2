@@ -95,6 +95,48 @@ is not compatible with Cloudflare Tunnel.
 
 ---
 
+## 3. Long files (>10-15 min): HTTP 524 despite being under the size limit
+
+### Symptom
+
+An audio file that passes the size check (e.g. 80 MB, ~1h of AAC audio) fails with an HTTP 524
+error during the "Transcription Whisper…" step, unlike a short test file which completes
+normally. Unlike incident #2, this isn't silent: the browser does get an actual error response —
+just a very late one.
+
+### Root cause
+
+**524 is a Cloudflare-specific error code**: "A timeout occurred", returned when the connection
+between Cloudflare and the origin (here, the tunnel to the Pi) is established fine, but the
+origin doesn't send a complete response within the allotted time. That delay ("Edge Response
+Timeout") is fixed at **100 seconds on Free/Pro/Business plans**, and only configurable on
+Enterprise.
+
+`/api/transcribe` was a fully synchronous endpoint: upload, FFmpeg splitting, Whisper
+transcription **chunk by chunk in a sequential loop** (`CHUNK_DURATION` = 10 min, so 6 API calls
+for 1h of audio), then possibly an LLM summary — all within a single HTTP request. The code
+already budgeted up to 480-600s for this pipeline on the nginx/Groq side (see `app/config.py`),
+which was pointless: Cloudflare cuts the connection at 100s regardless, before the Pi even
+finishes processing.
+
+### What resolved it
+
+The pipeline was made asynchronous: `POST /api/transcribe/start` saves the file and responds
+immediately (202 + `job_id`) while processing runs in the background on the Pi; the frontend then
+polls `GET /api/transcribe/status/{job_id}` every ~3s until it gets a terminal status. Each
+individual request stays fast (well under 100s), only the background processing can take as long
+as it needs. The old synchronous endpoint (`/process` and the `/api/transcribe` alias) is kept
+as-is so as not to break any other API clients (e.g. the separate PWA).
+
+### Note for the current deployment
+
+The job store is a plain per-job JSON file on disk (`app/services/jobs.py`), not an in-memory
+one: the backend runs with 2 Uvicorn workers (`Dockerfile`), and an in-memory dict wouldn't be
+visible across workers depending on which one handles the status request. A job the client never
+retrieves (tab closed mid-flight, etc.) is automatically cleaned up after 2h.
+
+---
+
 ## Reporting a new problem
 
 If your issue is not the one documented above, open an issue using the provided template. Include the relevant logs (`docker logs <container>` in prod, console output locally) and never paste a real `GROQ_API_KEY` value.

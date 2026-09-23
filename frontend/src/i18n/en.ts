@@ -16,6 +16,7 @@ const en = {
   "home.status.uploading": "Uploading file…",
   "home.status.cutting": "Splitting audio…",
   "home.status.whisper": "Whisper transcription…",
+  "home.status.whisperProgress": "Whisper transcription… ({current}/{total})",
   "home.status.structuring": "AI structuring…",
   "home.status.summaryDone": "✅ Study sheet generated!",
   "home.status.transcriptDone": "✅ Transcription complete!",
@@ -74,6 +75,7 @@ const en = {
 
   "api.httpError": "HTTP error {status}",
   "api.genericError": "Error {status}",
+  "api.timeout": "Processing is taking too long — please try again later.",
 } satisfies typeof fr;
 
 export default en;

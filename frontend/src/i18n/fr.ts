@@ -14,6 +14,7 @@ const fr = {
   "home.status.uploading": "Envoi du fichier…",
   "home.status.cutting": "Découpage en cours…",
   "home.status.whisper": "Transcription Whisper…",
+  "home.status.whisperProgress": "Transcription Whisper… ({current}/{total})",
   "home.status.structuring": "Structuration par l'IA…",
   "home.status.summaryDone": "✅ Fiche générée !",
   "home.status.transcriptDone": "✅ Transcription terminée !",
@@ -72,6 +73,7 @@ const fr = {
 
   "api.httpError": "Erreur HTTP {status}",
   "api.genericError": "Erreur {status}",
+  "api.timeout": "Le traitement prend trop de temps — réessayez plus tard.",
 };
 
 export type Translations = typeof fr;

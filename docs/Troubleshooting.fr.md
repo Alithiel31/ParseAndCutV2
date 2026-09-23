@@ -99,6 +99,50 @@ tunnel Cloudflare.
 
 ---
 
+## 3. Fichiers longs (>10-15 min) : HTTP 524 malgré une taille sous la limite
+
+### Symptôme
+
+Un fichier audio qui passe la limite de taille (ex. 80 Mo, ~1h d'audio en AAC) échoue avec une
+erreur HTTP 524 pendant l'étape « Transcription Whisper… », contrairement à un petit fichier de
+test qui aboutit normalement. Contrairement à l'incident n°2, ce n'est pas silencieux : le
+navigateur reçoit une vraie réponse d'erreur — juste très en retard.
+
+### Root cause
+
+**524 est un code d'erreur spécifique à Cloudflare** : « A timeout occurred », renvoyé quand la
+connexion entre Cloudflare et l'origine (ici, le tunnel vers le Pi) s'établit bien, mais que
+l'origine ne renvoie pas de réponse complète dans le délai imparti. Ce délai (« Edge Response
+Timeout ») est fixé à **100 secondes sur les plans Free/Pro/Business**, et n'est réglable qu'en
+Enterprise.
+
+Or `/api/transcribe` était un endpoint entièrement synchrone : upload, découpage FFmpeg,
+transcription Whisper **chunk par chunk en boucle séquentielle** (`CHUNK_DURATION` = 10 min, donc
+6 appels API pour 1h d'audio), puis éventuellement résumé LLM — le tout dans une seule requête
+HTTP. Le code prévoyait déjà jusqu'à 480-600s pour ce pipeline côté nginx/Groq (voir
+`app/config.py`), ce qui ne servait à rien : Cloudflare tranche la connexion à 100s quoi qu'il
+arrive, avant même que le Pi ait fini son traitement.
+
+### Ce qui a résolu le problème
+
+Le pipeline a été rendu asynchrone : `POST /api/transcribe/start` sauvegarde le fichier et
+répond immédiatement (202 + `job_id`) pendant que le traitement tourne en tâche de fond sur le
+Pi ; le frontend interroge ensuite `GET /api/transcribe/status/{job_id}` toutes les ~3s jusqu'à
+obtenir un statut terminal. Chaque requête individuelle reste rapide (bien sous 100s), seul le
+traitement de fond peut prendre le temps qu'il faut. L'ancien endpoint synchrone (`/process` et
+l'alias `/api/transcribe`) est conservé tel quel pour ne pas casser d'éventuels autres clients de
+l'API (ex. la PWA séparée).
+
+### Point de vigilance pour l'hébergement actuel
+
+Le store de jobs est un simple fichier JSON par job sur disque (`app/services/jobs.py`), pas une
+solution en mémoire : le backend tourne avec 2 workers Uvicorn (`Dockerfile`), et un dict en
+mémoire ne serait pas visible d'un worker à l'autre selon celui qui reçoit la requête de statut.
+Un job jamais récupéré par le client (onglet fermé en cours de route, etc.) est nettoyé
+automatiquement au bout de 2h.
+
+---
+
 ## Signaler un nouveau problème
 
 Si votre incident n'est pas celui documenté ci-dessus, ouvrez une issue en suivant le template fourni. Incluez les logs pertinents (`docker logs <container>` en prod, sortie console en local) et ne collez jamais de vraie valeur de `GROQ_API_KEY`.
