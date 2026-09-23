@@ -70,15 +70,22 @@ class TestTranscribeStartValidation:
 
     def test_ne_bloque_pas_la_reponse(self, client_app, monkeypatch, tmp_path):
         # Le point central du flux asynchrone : /start doit répondre 202
-        # immédiatement (job_id), avant même que le pipeline n'ait démarré.
+        # immédiatement (job_id), avant même que le pipeline n'ait fini.
+        #
+        # Important : le test attend explicitement la fin du job (via
+        # _attendre_fin_job) avant de rendre la main. `_traiter_job` tourne
+        # dans un vrai thread et résout découper_audio/transcrire_chunk/client
+        # par lookup global à *chaque* appel — si ce thread survivait au-delà
+        # du test, le monkeypatch teardown pourrait s'exécuter pendant qu'il
+        # tourne encore, et un test suivant pourrait alors monkeypatcher ces
+        # globals pendant que ce thread orphelin les relit, produisant un
+        # résultat aléatoire selon le timing (observé de façon intermittente
+        # en CI : cf. historique git).
         fake_chunk = tmp_path / "chunk_0.mp3"
         fake_chunk.write_bytes(b"faux audio")
 
-        démarré = MagicMock()
-
         def _decouper_lent(*a, **k):
-            démarré.set()
-            time.sleep(0.2)
+            time.sleep(0.05)
             return [str(fake_chunk)]
 
         monkeypatch.setattr(transcribe, "découper_audio", _decouper_lent)
@@ -88,10 +95,17 @@ class TestTranscribeStartValidation:
         monkeypatch.setattr(transcribe, "client", MagicMock())
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
-        resp = client_app.post("/api/transcribe/start", files=files)
+        avant = time.monotonic()
+        resp = client_app.post(
+            "/api/transcribe/start", files=files, data={"mode": "transcript"}
+        )
+        écoulé = time.monotonic() - avant
 
         assert resp.status_code == 202
-        assert "job_id" in resp.json()
+        job_id = resp.json()["job_id"]
+        assert écoulé < 0.05, "la réponse a attendu la fin du découpage (pipeline pas asynchrone)"
+
+        _attendre_fin_job(client_app, job_id)
 
 
 class TestTranscribeStatusRoute:
