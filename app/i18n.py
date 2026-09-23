@@ -22,6 +22,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "transcription_error": "Erreur de transcription : {error}",
         "groq_api_error": "Erreur API Groq : {error}",
         "internal_error": "Erreur interne du serveur",
+        "job_not_found": "Job introuvable ou déjà récupéré",
     },
     "en": {
         "invalid_lang": "Langue invalide (fr/en attendu) / Invalid language (expected fr/en)",
@@ -36,6 +37,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "transcription_error": "Transcription error: {error}",
         "groq_api_error": "Groq API error: {error}",
         "internal_error": "Internal server error",
+        "job_not_found": "Job not found or already retrieved",
     },
 }
 

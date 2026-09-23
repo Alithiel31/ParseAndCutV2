@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import DropZone from "../components/DropZone";
 import ProgressSteps, { STEPS } from "../components/ProgressSteps";
 import ResultView from "../components/ResultView";
-import { transcribeAudio, type TranscribeMode, type TranscribeResult } from "../api";
+import { transcribeAudio, type JobProgress, type TranscribeMode, type TranscribeResult } from "../api";
 import { useLanguage, useTranslation } from "../i18n";
 import { getPermission, isNotificationSupported, notifyResult, requestPermission } from "../notifications";
 
@@ -26,7 +26,6 @@ export default function Home() {
     }
   });
   const resultRef = useRef<HTMLDivElement>(null);
-  const timers = useRef<number[]>([]);
   const { t } = useTranslation();
   const { lang } = useLanguage();
 
@@ -52,9 +51,24 @@ export default function Home() {
     }
   }, [phase]);
 
-  function clearTimers() {
-    timers.current.forEach((t) => window.clearTimeout(t));
-    timers.current = [];
+  function handleProgress(progress: JobProgress) {
+    if (progress.step === "cutting") {
+      setActiveStep("step-cut");
+      setStatusText(t("home.status.cutting"));
+    } else if (progress.step === "whisper") {
+      setActiveStep("step-whisper");
+      setStatusText(
+        progress.chunkTotal && progress.chunkTotal > 1
+          ? t("home.status.whisperProgress", {
+              current: progress.chunkCurrent ?? 1,
+              total: progress.chunkTotal,
+            })
+          : t("home.status.whisper")
+      );
+    } else if (progress.step === "llm") {
+      setActiveStep("step-llm");
+      setStatusText(t("home.status.structuring"));
+    }
   }
 
   async function handleSubmit() {
@@ -68,23 +82,8 @@ export default function Home() {
     setActiveStep(STEPS[0].id);
     setStatusText(t("home.status.uploading"));
 
-    const stepTimings: [string, number, string][] = [
-      ["step-cut", 1500, t("home.status.cutting")],
-      ["step-whisper", 4000, t("home.status.whisper")],
-      ...(mode === "summary"
-        ? ([["step-llm", 9000, t("home.status.structuring")]] as [string, number, string][])
-        : []),
-    ];
-    timers.current = stepTimings.map(([id, delay, label]) =>
-      window.setTimeout(() => {
-        setActiveStep(id);
-        setStatusText(label);
-      }, delay)
-    );
-
     try {
-      const data = await transcribeAudio(file, mode, lang);
-      clearTimers();
+      const data = await transcribeAudio(file, mode, lang, handleProgress);
       setResult(data);
       setStatusText(mode === "summary" ? t("home.status.summaryDone") : t("home.status.transcriptDone"));
       setPhase("done");
@@ -95,7 +94,6 @@ export default function Home() {
         );
       }
     } catch (e) {
-      clearTimers();
       setError(e instanceof Error ? e.message : t("home.errors.unknown"));
       setPhase("error");
     }

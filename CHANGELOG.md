@@ -5,6 +5,19 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 
 ## [Unreleased]
 
+### Added
+
+- Asynchronous transcription flow: `POST /api/transcribe/start` (returns a `job_id` immediately)
+  and `GET /api/transcribe/status/{job_id}` (polled by the frontend), backed by a simple
+  file-based job store (`app/services/jobs.py`) shared across Uvicorn workers. Works around
+  Cloudflare's fixed 100s edge response timeout on Free/Pro/Business plans, which was cutting
+  connections with an HTTP 524 on any audio file long enough (~10-15+ min) that the fully
+  synchronous `/process`/`/api/transcribe` pipeline (splitting + sequential Whisper calls per
+  chunk + LLM summary) couldn't finish in time — see [`docs/Troubleshooting.md`](./docs/Troubleshooting.md#3-long-files-10-15-min-http-524-despite-being-under-the-size-limit).
+  The frontend now shows real per-chunk transcription progress instead of a fixed-timing
+  simulation. The old synchronous endpoints are kept unchanged for backward compatibility with
+  other API clients (e.g. the separate PWA)
+
 ## [1.2.0] - 2026-09-01
 
 ### Added
