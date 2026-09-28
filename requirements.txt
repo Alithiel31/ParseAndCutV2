@@ -17,7 +17,7 @@ slowapi==0.1.10
 # Variables d'environnement
 python-dotenv==1.2.3
 
-flake8==7.3.0
+flake8==7.4.1
 
 # Tests
 # httpx : dépendance transitive de groq (client HTTP interne du SDK)
