@@ -50,6 +50,10 @@ MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", 100))
 # Protège les crédits Groq et les ressources du Raspberry Pi contre les abus anonymes.
 RATE_LIMIT_PROCESS = os.getenv("RATE_LIMIT_PROCESS", "5/minute")
 
+# Persistance (SQLite + fichiers audio). En Docker : volume monté sur /data.
+DATA_DIR = os.getenv("DATA_DIR", os.path.join(os.getcwd(), "data"))
+DB_PATH  = os.getenv("DB_PATH", os.path.join(DATA_DIR, "parseandcut.db"))
+
 # --- INITIALISATION GROQ ---
 api_key = os.environ.get("GROQ_API_KEY")
 client  = None

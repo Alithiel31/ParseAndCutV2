@@ -50,4 +50,6 @@ frontend/twa-parseandcut/.gradle/
 frontend/twa-parseandcut/build/
 frontend/twa-parseandcut/app/build/
 frontend/twa-parseandcut/*.apk
-frontend/twa-parseandcut/*.aab
+frontend/twa-parseandcut/*.aab
+# Données runtime (SQLite + audio)
+/data/
