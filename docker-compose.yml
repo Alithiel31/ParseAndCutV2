@@ -4,6 +4,8 @@ services:
   backend:
     build:
       context: .
+    labels:
+      - "homelab.tier=app"
     env_file:
       - .env
     environment:
@@ -20,6 +22,7 @@ services:
       - default
       - traefik-net
     labels:
+      - "homelab.tier=app"
       - "traefik.enable=true"
       - "traefik.http.routers.parseandcut.rule=Host(`parseandcut.alithiel31.dev`)"
       - "traefik.http.routers.parseandcut.entrypoints=web"
