@@ -530,6 +530,41 @@ header h1 a {
 .step-badge.active { border-color: #818cf8; background: rgb(99 102 241 / 22%); color: #eef0ff; }
 .step-badge.done { border-color: rgb(74 222 128 / 35%); background: rgb(34 197 94 / 9%); }
 .processing-note { margin: 0.9rem 0 0; color: #8492ad; font-size: 0.78rem; line-height: 1.5; }
+.source-divider { display: flex; align-items: center; gap: 0.9rem; margin: 1.4rem 0; color: #8492ad; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.source-divider::before, .source-divider::after { height: 1px; flex: 1; background: var(--border); content: ""; }
+.audio-recorder { padding: 1.15rem; border: 1px solid var(--border); border-radius: 14px; background: rgb(8 15 29 / 30%); }
+.recorder-header { display: flex; align-items: center; gap: 0.8rem; }
+.recorder-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; background: rgb(239 68 68 / 12%); color: #f87171; font-size: 0.8rem; }
+.recorder-header h3 { margin: 0; font-size: 0.95rem; }
+.recorder-header p { margin: 0.25rem 0 0; color: var(--text-dim); font-size: 0.8rem; line-height: 1.45; }
+.audio-recorder.is-recording .recorder-icon { animation: pulse-recording 1.4s ease-in-out infinite; }
+@keyframes pulse-recording { 50% { box-shadow: 0 0 0 7px rgb(248 113 113 / 13%); } }
+.recorder-live { display: flex; align-items: center; gap: 0.55rem; margin: 1rem 0; color: #fda4af; font-variant-numeric: tabular-nums; font-size: 1.05rem; font-weight: 700; }
+.recording-dot { width: 9px; height: 9px; border-radius: 50%; background: #fb7185; }
+.recorder-size { margin-left: auto; color: var(--text-dim); font-size: 0.78rem; font-weight: 500; }
+.recorder-live strong { color: var(--text-dim); font-size: 0.78rem; font-weight: 500; }
+.recorder-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+.btn-recorder { min-height: 42px; padding: 0.6rem 0.9rem; border: 1px solid #6673b3; border-radius: 10px; background: rgb(99 102 241 / 14%); color: var(--text); font: inherit; font-size: 0.84rem; font-weight: 650; cursor: pointer; }
+.btn-recorder:hover:not(:disabled) { border-color: #a5b4fc; background: rgb(99 102 241 / 24%); }
+.btn-recorder:focus-visible { outline: 3px solid rgb(165 180 252 / 65%); outline-offset: 3px; }
+.btn-recorder:disabled { opacity: 0.6; cursor: wait; }
+.btn-recorder-secondary { border-color: #526080; background: #202c48; }
+.btn-recorder-stop { border-color: rgb(248 113 113 / 45%); background: rgb(239 68 68 / 12%); }
+.recording-preview { margin-top: 1rem; }
+.recording-preview p { margin: 0 0 0.5rem; color: #cbd5e1; font-size: 0.82rem; overflow-wrap: anywhere; }
+.recording-preview audio { display: block; width: 100%; height: 42px; }
+.recorder-error { margin: 0.9rem 0 0; padding: 0.7rem 0.8rem; border: 1px solid rgb(248 113 113 / 42%); border-radius: 9px; background: rgb(239 68 68 / 9%); color: #fecaca; font-size: 0.82rem; line-height: 1.5; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 @media (max-width: 600px) {
   .container { padding: 24px 14px 72px; }
@@ -542,6 +577,8 @@ header h1 a {
   .mode-option { min-height: 82px; }
   .progress-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .processing-panel { padding: 1rem; }
+  .audio-recorder { padding: 1rem; }
+  .recorder-actions .btn-recorder { flex: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

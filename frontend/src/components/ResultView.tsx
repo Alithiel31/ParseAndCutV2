@@ -12,7 +12,7 @@ interface ResultViewProps {
 }
 
 export default function ResultView({ mode, markdown, transcript, stats }: ResultViewProps) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const isSummary = mode === "summary";
   const { t } = useTranslation();
 
@@ -29,31 +29,33 @@ export default function ResultView({ mode, markdown, transcript, stats }: Result
     [isSummary, markdown]
   );
 
-  function handleCopy() {
-    if (isSummary) {
-      // Copie le texte brut rendu (sans balises HTML)
-      const tmp = document.createElement("div");
-      tmp.innerHTML = html;
-      navigator.clipboard.writeText(tmp.innerText).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      });
-    } else {
-      navigator.clipboard.writeText(transcript ?? "").then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      });
+  async function handleCopy() {
+    try {
+      let textToCopy = transcript ?? "";
+      if (isSummary) {
+        const tmp = document.createElement("div");
+        tmp.innerHTML = html;
+        textToCopy = tmp.innerText;
+      }
+      await navigator.clipboard.writeText(textToCopy);
+      setCopyState("copied");
+      window.setTimeout(() => setCopyState("idle"), 2500);
+    } catch {
+      setCopyState("failed");
     }
   }
 
   return (
-    <section id="resultArea">
+    <section id="resultArea" aria-labelledby="result-title">
       <div className="result-header">
-        <h2>{t(isSummary ? "result.summaryTitle" : "result.transcriptTitle")}</h2>
+        <h2 id="result-title">{t(isSummary ? "result.summaryTitle" : "result.transcriptTitle")}</h2>
         <button className="btn-secondary" onClick={handleCopy}>
-          {t(copied ? "result.copied" : "result.copy")}
+          {t(copyState === "copied" ? "result.copied" : "result.copy")}
         </button>
       </div>
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {copyState === "copied" ? t("result.copied") : copyState === "failed" ? t("result.copyFailed") : ""}
+      </p>
 
       <div className="stats-bar">
         <span>{t("result.chunks", { count: stats.chunks })}</span>

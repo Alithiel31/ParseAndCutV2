@@ -57,7 +57,8 @@ export async function transcribeAudio(
   file: File,
   mode: TranscribeMode = "summary",
   lang: Lang = "fr",
-  onProgress?: (progress: JobProgress) => void
+  onProgress?: (progress: JobProgress) => void,
+  onJobStarted?: (jobId: string) => void
 ): Promise<TranscribeResult> {
   const formData = new FormData();
   formData.append("audio", file);
@@ -74,7 +75,24 @@ export async function transcribeAudio(
   }
 
   const { job_id: jobId } = (await startResponse.json()) as { job_id: string };
+  onJobStarted?.(jobId);
 
+  return followTranscriptionJob(jobId, lang, onProgress);
+}
+
+export async function resumeTranscription(
+  jobId: string,
+  lang: Lang = "fr",
+  onProgress?: (progress: JobProgress) => void
+): Promise<TranscribeResult> {
+  return followTranscriptionJob(jobId, lang, onProgress);
+}
+
+async function followTranscriptionJob(
+  jobId: string,
+  lang: Lang,
+  onProgress?: (progress: JobProgress) => void
+): Promise<TranscribeResult> {
   const deadline = Date.now() + MAX_POLL_MS;
   for (;;) {
     if (Date.now() > deadline) {
