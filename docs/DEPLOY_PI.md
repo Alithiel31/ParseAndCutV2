@@ -21,11 +21,10 @@ docker info   # doit afficher l'OS/l'arch du Pi
 Depuis ce dossier (`ParseAndCutV2`), avec le context `rpi` actif :
 
 ```bash
-docker compose build
 bash deploy.sh
 ```
 
-`deploy.sh` récupère `GROQ_API_KEY` depuis Infisical (voir section 4) et lance `docker compose up -d` avec cette variable injectée.
+`deploy.sh` récupère `GROQ_API_KEY` depuis Infisical (voir section 4) et lance `docker compose up -d --build` avec cette variable injectée : les images sont reconstruites à chaque déploiement, plus besoin de `docker compose build` séparé.
 
 Docker envoie le contexte de build (fichiers locaux de `app/` et `frontend/`) au démon
 distant du Pi — pas besoin de cloner quoi que ce soit sur le Pi. Le frontend est routé via

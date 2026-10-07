@@ -18,6 +18,10 @@ jobs:
         with:
           workflow: build-twa.yml
           name: parseandcut-release
+          # Prend l'artefact du run qui a déclenché ce workflow (vide en
+          # workflow_dispatch → repli sur le dernier build réussi)
+          run_id: ${{ github.event.workflow_run.id }}
+          workflow_conclusion: success
 
       - name: Publish to Play Store (Internal Testing)
         uses: r0adkll/upload-google-play@v1

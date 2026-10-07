@@ -24,4 +24,4 @@ infisical run \
   --domain="$INFISICAL_DOMAIN" \
   --projectId="$INFISICAL_PROJECT_ID" \
   --env="$INFISICAL_ENV" \
-  -- docker compose up -d
+  -- docker compose up -d --build
