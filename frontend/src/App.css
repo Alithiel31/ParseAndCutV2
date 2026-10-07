@@ -5,7 +5,9 @@
   /* Couleurs */
   --primary: #818cf8;
   --primary-hover: #6366f1;
-  --primary-rgb: 99 102 241;        /* teintes transparentes : rgb(var(--primary-rgb) / x%) */
+  --primary-rgb: 99 102 241;
+  --action: #4f46e5;               /* fond du bouton principal : blanc dessus = 6.3:1 */
+  --action-hover: #4338ca;        /* teintes transparentes : rgb(var(--primary-rgb) / x%) */
   --accent-soft: #a5b4fc;
   --accent-softer: #c7d2fe;
 
@@ -176,7 +178,7 @@ header p {
   padding: var(--space-4);
   border: none;
   border-radius: var(--radius-lg);
-  background: var(--primary);
+  background: var(--action);
   color: white;
   font-size: 1.1rem;
   font-weight: 700;
@@ -185,12 +187,13 @@ header p {
   transition: background var(--transition), transform 0.1s;
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: var(--primary-hover);
+.btn-primary:hover:not(:disabled, [aria-disabled="true"]) {
+  background: var(--action-hover);
   transform: translateY(-1px);
 }
 
-.btn-primary:disabled {
+.btn-primary:disabled,
+.btn-primary[aria-disabled="true"] {
   opacity: 0.5;
   box-shadow: none;
   cursor: not-allowed;
@@ -380,8 +383,7 @@ header p {
   line-height: 1.45;
 }
 
-.audio-recorder.is-recording .recorder-icon { animation: pulse-recording 1.4s ease-in-out infinite; }
-@keyframes pulse-recording { 50% { box-shadow: 0 0 0 7px rgb(248 113 113 / 13%); } }
+.audio-recorder.is-recording .recorder-icon { background: rgb(239 68 68 / 16%); color: #fca5a5; }
 
 .recorder-live {
   display: flex;
@@ -608,6 +610,8 @@ header p {
   background: rgb(var(--primary-rgb) / 22%);
   color: var(--text);
 }
+
+.step-check { margin-right: var(--space-1); }
 
 .step-badge.done {
   border-color: rgb(var(--success-rgb) / 35%);

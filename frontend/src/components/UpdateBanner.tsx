@@ -10,7 +10,7 @@ export default function UpdateBanner({ onUpdate, onDismiss }: UpdateBannerProps)
 
   return (
     <div className="update-banner">
-      <span>{t("updateBanner.text")}</span>
+      <span role="status">{t("updateBanner.text")}</span>
       <button className="btn-secondary" onClick={onUpdate}>
         {t("updateBanner.update")}
       </button>

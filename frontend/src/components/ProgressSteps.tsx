@@ -26,12 +26,15 @@ export default function ProgressSteps({ activeId, mode }: ProgressStepsProps) {
   return (
     <ol className="progress-steps" aria-label={t("home.progress.label")}>
       {visibleSteps.map((s, idx) => {
+        const done = idx < activeIdx;
         let cls = "step-badge";
-        if (idx < activeIdx) cls += " done";
+        if (done) cls += " done";
         else if (idx === activeIdx) cls += " active";
         return (
           <li key={s.id} className={cls} aria-current={idx === activeIdx ? "step" : undefined}>
+            {done && <span className="step-check" aria-hidden="true">✓</span>}
             {t(s.labelKey)}
+            {done && <span className="sr-only"> {t("steps.done")}</span>}
           </li>
         );
       })}

@@ -201,7 +201,7 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
   return (
     <section className={`audio-recorder${phase === "recording" ? " is-recording" : ""}`} aria-labelledby="recorder-title">
       <div className="recorder-header">
-        <span className="recorder-icon" aria-hidden="true">●</span>
+        <span className="recorder-icon" aria-hidden="true">🎙</span>
         <div>
           <h3 id="recorder-title">{t("recorder.title")}</h3>
           <p>{t("recorder.description")}</p>
@@ -234,7 +234,7 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
       <div className="recorder-actions">
         {(phase === "idle" || phase === "error" || phase === "ready") && (
           <button type="button" className="btn-recorder" onClick={startRecording} disabled={disabled}>
-            {phase === "ready" || phase === "error" ? t("recorder.again") : t("recorder.start")}
+            {phase === "ready" || phase === "error" ? t("recorder.again") : <><span aria-hidden="true">● </span>{t("recorder.start")}</>}
           </button>
         )}
         {phase === "preparing" && <button type="button" className="btn-recorder" disabled>{t("recorder.preparing")}</button>}

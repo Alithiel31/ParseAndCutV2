@@ -261,7 +261,12 @@ export default function Home() {
           </label>
         )}
 
-        <button className="btn-primary" onClick={handleSubmit} disabled={controlsDisabled || !file}>
+        <button
+          className="btn-primary"
+          onClick={handleSubmit}
+          disabled={controlsDisabled}
+          aria-disabled={!file || undefined}
+        >
           {loading
             ? t("home.submit.loading")
             : mode === "summary"

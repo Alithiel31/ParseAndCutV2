@@ -45,7 +45,7 @@ const fr = {
 
   "recorder.title": "Enregistrer depuis le micro",
   "recorder.description": "Enregistrez un cours ou une réunion directement depuis cet appareil.",
-  "recorder.start": "● Démarrer l’enregistrement",
+  "recorder.start": "Démarrer l’enregistrement",
   "recorder.again": "↻ Recommencer",
   "recorder.pause": "Mettre en pause",
   "recorder.resume": "Reprendre",
@@ -82,6 +82,7 @@ const fr = {
   "steps.step-cut": "✂️ Découpage",
   "steps.step-whisper": "🎙️ Transcription",
   "steps.step-llm": "🧠 Structuration",
+  "steps.done": "(terminé)",
 
   "result.summaryTitle": "📝 Fiche de résumé",
   "result.transcriptTitle": "📄 Transcription",

@@ -47,7 +47,7 @@ const en = {
 
   "recorder.title": "Record from your microphone",
   "recorder.description": "Record a lecture or meeting directly from this device.",
-  "recorder.start": "● Start recording",
+  "recorder.start": "Start recording",
   "recorder.again": "↻ Record again",
   "recorder.pause": "Pause",
   "recorder.resume": "Resume",
@@ -84,6 +84,7 @@ const en = {
   "steps.step-cut": "✂️ Splitting",
   "steps.step-whisper": "🎙️ Transcription",
   "steps.step-llm": "🧠 Structuring",
+  "steps.done": "(done)",
 
   "result.summaryTitle": "📝 Study sheet",
   "result.transcriptTitle": "📄 Transcript",

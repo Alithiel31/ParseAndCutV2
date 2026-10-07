@@ -1,8 +1,8 @@
 import { useLanguage, useTranslation, type Lang } from "../i18n";
 
-const OPTIONS: { value: Lang; label: string }[] = [
-  { value: "fr", label: "🇫🇷 FR" },
-  { value: "en", label: "🇬🇧 EN" },
+const OPTIONS: { value: Lang; flag: string; code: string; name: string }[] = [
+  { value: "fr", flag: "🇫🇷", code: "FR", name: "Français" },
+  { value: "en", flag: "🇬🇧", code: "EN", name: "English" },
 ];
 
 export default function LanguageSwitcher() {
@@ -20,7 +20,8 @@ export default function LanguageSwitcher() {
             checked={lang === opt.value}
             onChange={() => setLang(opt.value)}
           />
-          <span>{opt.label}</span>
+          <span aria-hidden="true">{opt.flag} {opt.code}</span>
+          <span className="sr-only" lang={opt.value}>{opt.name}</span>
         </label>
       ))}
     </div>

@@ -36,7 +36,7 @@ export default function App() {
       <header>
         <LanguageSwitcher />
         <h1>
-          <Link to="/">🎓 {t("meta.appName")}</Link>
+          <Link to="/"><span aria-hidden="true">🎓</span> {t("meta.appName")}</Link>
         </h1>
         <p>{t("header.tagline")}</p>
       </header>
