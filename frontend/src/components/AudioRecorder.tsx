@@ -185,6 +185,16 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
     recorder.stop();
   }
 
+  function downloadRecording() {
+    if (!recordedUrl || !recordedFile) return;
+    const link = document.createElement("a");
+    link.href = recordedUrl;
+    link.download = recordedFile.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
   const timeLabel = formatTime(elapsedMs);
   const busy = phase === "preparing" || phase === "recording" || phase === "paused" || phase === "stopping";
 
@@ -215,6 +225,9 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
         <div className="recording-preview">
           <p>{t("recorder.preview", { name: recordedFile?.name ?? "" })}</p>
           <audio controls src={recordedUrl} preload="metadata">{t("recorder.audioUnsupported")}</audio>
+          <button type="button" className="btn-recorder btn-recorder-secondary" onClick={downloadRecording}>
+            {t("recorder.download")}
+          </button>
         </div>
       )}
 

@@ -56,6 +56,7 @@ const fr = {
   "recorder.size": "{size} Mo",
   "recorder.timerAria": "Durée de l’enregistrement : {time}",
   "recorder.preview": "Écoutez votre enregistrement : {name}",
+  "recorder.download": "Télécharger l’enregistrement",
   "recorder.audioUnsupported": "La lecture audio n’est pas prise en charge par ce navigateur.",
   "recorder.error.unsupported": "L’enregistrement audio n’est pas pris en charge par ce navigateur. Vous pouvez importer un fichier à la place.",
   "recorder.error.permission": "L’accès au micro a été refusé. Autorisez-le dans les réglages du navigateur, ou importez un fichier.",

@@ -553,6 +553,7 @@ header h1 a {
 .recording-preview { margin-top: 1rem; }
 .recording-preview p { margin: 0 0 0.5rem; color: #cbd5e1; font-size: 0.82rem; overflow-wrap: anywhere; }
 .recording-preview audio { display: block; width: 100%; height: 42px; }
+.recording-preview .btn-recorder { margin-top: 0.7rem; }
 .recorder-error { margin: 0.9rem 0 0; padding: 0.7rem 0.8rem; border: 1px solid rgb(248 113 113 / 42%); border-radius: 9px; background: rgb(239 68 68 / 9%); color: #fecaca; font-size: 0.82rem; line-height: 1.5; }
 .sr-only {
   position: absolute;

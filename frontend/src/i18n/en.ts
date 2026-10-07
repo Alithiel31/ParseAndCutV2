@@ -58,6 +58,7 @@ const en = {
   "recorder.size": "{size} MB",
   "recorder.timerAria": "Recording duration: {time}",
   "recorder.preview": "Listen to your recording: {name}",
+  "recorder.download": "Download recording",
   "recorder.audioUnsupported": "Audio playback is not supported by this browser.",
   "recorder.error.unsupported": "Audio recording is not supported by this browser. You can upload a file instead.",
   "recorder.error.permission": "Microphone access was denied. Allow it in your browser settings, or upload a file.",
