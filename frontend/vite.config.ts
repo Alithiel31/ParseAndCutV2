@@ -13,8 +13,8 @@ export default defineConfig({
         name: 'Assistant Transcripteur IA',
         short_name: 'ParseAndCut',
         description: 'Transcription et résumé de cours audio avec Whisper et IA',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        theme_color: '#0b1020',
+        background_color: '#0b1020',
         display: 'standalone',
         start_url: '/',
         icons: [
