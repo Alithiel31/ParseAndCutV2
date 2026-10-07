@@ -10,15 +10,16 @@ interface DropZoneProps {
   onFileSelected: (file: File) => void;
   onError: (message: string) => void;
   selectedFileLabel: string;
+  disabled?: boolean;
 }
 
-export default function DropZone({ onFileSelected, onError, selectedFileLabel }: DropZoneProps) {
+export default function DropZone({ onFileSelected, onError, selectedFileLabel, disabled = false }: DropZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const { t } = useTranslation();
 
   function handleFile(file: File | undefined) {
-    if (!file) return;
+    if (!file || disabled) return;
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
       onError(t("dropzone.tooLarge", { maxMb: MAX_SIZE_MB }));
       return;
@@ -26,7 +27,7 @@ export default function DropZone({ onFileSelected, onError, selectedFileLabel }:
     onFileSelected(file);
   }
 
-  function onDrop(e: DragEvent<HTMLLabelElement>) {
+  function onDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDragOver(false);
     handleFile(e.dataTransfer.files?.[0]);
@@ -38,28 +39,41 @@ export default function DropZone({ onFileSelected, onError, selectedFileLabel }:
 
   return (
     <>
-      <label
-        htmlFor="audioFile"
+      <div
         className={`drop-zone${dragOver ? " drag-over" : ""}`}
+        aria-disabled={disabled}
         onDragOver={(e) => {
           e.preventDefault();
-          setDragOver(true);
+          if (!disabled) setDragOver(true);
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
       >
-        <span className="icon">☁️</span>
-        <span className="text">{t("dropzone.hint")}</span>
+        <span className="drop-zone-icon" aria-hidden="true">♫</span>
+        <div className="drop-zone-copy">
+          <strong>{t("dropzone.title")}</strong>
+          <span className="text">{t("dropzone.hint")}</span>
+        </div>
+        <button
+          type="button"
+          className="btn-file-picker"
+          onClick={() => inputRef.current?.click()}
+          disabled={disabled}
+        >
+          {t("dropzone.choose")}
+        </button>
         <input
           ref={inputRef}
           type="file"
           id="audioFile"
           accept="audio/*"
           hidden
+          disabled={disabled}
           onChange={onChange}
         />
-      </label>
-      <div className="file-name-display">{selectedFileLabel}</div>
+        <span className="drop-zone-limit">{t("dropzone.limits", { maxMb: MAX_SIZE_MB })}</span>
+      </div>
+      {selectedFileLabel && <div className="file-name-display" aria-live="polite">{selectedFileLabel}</div>}
     </>
   );
 }

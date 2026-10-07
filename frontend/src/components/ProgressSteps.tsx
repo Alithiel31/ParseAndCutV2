@@ -1,4 +1,5 @@
 import { useTranslation, type TranslationKey } from "../i18n";
+import type { TranscribeMode } from "../api";
 
 export interface Step {
   id: string;
@@ -14,25 +15,26 @@ export const STEPS: Step[] = [
 
 interface ProgressStepsProps {
   activeId: string;
-  done: boolean;
+  mode: TranscribeMode;
 }
 
-export default function ProgressSteps({ activeId, done }: ProgressStepsProps) {
+export default function ProgressSteps({ activeId, mode }: ProgressStepsProps) {
   const { t } = useTranslation();
-  const activeIdx = STEPS.findIndex((s) => s.id === activeId);
+  const visibleSteps = mode === "transcript" ? STEPS.filter((step) => step.id !== "step-llm") : STEPS;
+  const activeIdx = visibleSteps.findIndex((s) => s.id === activeId);
 
   return (
-    <div className="progress-steps">
-      {STEPS.map((s, idx) => {
+    <ol className="progress-steps" aria-label={t("home.progress.label")}>
+      {visibleSteps.map((s, idx) => {
         let cls = "step-badge";
-        if (done || idx < activeIdx) cls += " done";
+        if (idx < activeIdx) cls += " done";
         else if (idx === activeIdx) cls += " active";
         return (
-          <span key={s.id} className={cls}>
+          <li key={s.id} className={cls} aria-current={idx === activeIdx ? "step" : undefined}>
             {t(s.labelKey)}
-          </span>
+          </li>
         );
       })}
-    </div>
+    </ol>
   );
 }

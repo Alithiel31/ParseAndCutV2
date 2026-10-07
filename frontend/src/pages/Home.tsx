@@ -102,9 +102,16 @@ export default function Home() {
   const loading = phase === "loading";
 
   return (
-    <main className="card">
-      <div className="upload-section">
+    <main className="card home-card">
+      <section className="home-intro" aria-labelledby="home-title">
+        <span className="eyebrow">{t("home.eyebrow")}</span>
+        <h2 id="home-title">{t("home.title")}</h2>
+        <p>{t("home.description")}</p>
+      </section>
+
+      <div className="upload-section" aria-busy={loading}>
         <DropZone
+          disabled={loading}
           onFileSelected={(f) => {
             setFile(f);
             setError(null);
@@ -117,7 +124,7 @@ export default function Home() {
           }
         />
 
-        {error && <div className="error-banner">⚠️ {error}</div>}
+        {error && <div className="error-banner" role="alert">⚠️ {error}</div>}
 
         <div className="mode-selector" role="radiogroup" aria-label={t("home.modeSelector.label")}>
           <label className={`mode-option${mode === "summary" ? " active" : ""}`}>
@@ -127,8 +134,10 @@ export default function Home() {
               value="summary"
               checked={mode === "summary"}
               onChange={() => setMode("summary")}
+              disabled={loading}
             />
-            <span>{t("home.mode.summary")}</span>
+            <span className="mode-icon" aria-hidden="true">✦</span>
+            <span className="mode-copy"><strong>{t("home.mode.summary")}</strong><small>{t("home.mode.summaryDescription")}</small></span>
           </label>
           <label className={`mode-option${mode === "transcript" ? " active" : ""}`}>
             <input
@@ -137,8 +146,10 @@ export default function Home() {
               value="transcript"
               checked={mode === "transcript"}
               onChange={() => setMode("transcript")}
+              disabled={loading}
             />
-            <span>{t("home.mode.transcript")}</span>
+            <span className="mode-icon" aria-hidden="true">≋</span>
+            <span className="mode-copy"><strong>{t("home.mode.transcript")}</strong><small>{t("home.mode.transcriptDescription")}</small></span>
           </label>
         </div>
 
@@ -148,21 +159,29 @@ export default function Home() {
               type="checkbox"
               checked={notifyEnabled}
               onChange={(e) => handleNotifyToggle(e.target.checked)}
+              disabled={loading}
             />
             <span>{t("notify.toggle")}</span>
           </label>
         )}
 
-        <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
-          {mode === "summary" ? t("home.submit.summary") : t("home.submit.transcript")}
+        <button className="btn-primary" onClick={handleSubmit} disabled={loading || !file}>
+          {loading
+            ? t("home.submit.loading")
+            : mode === "summary"
+              ? t("home.submit.summary")
+              : t("home.submit.transcript")}
         </button>
       </div>
 
       {loading && (
-        <div id="loader">
-          <div className="spinner" />
-          <p>{statusText}</p>
-          <ProgressSteps activeId={activeStep} done={false} />
+        <div id="loader" className="processing-panel" role="status" aria-live="polite" aria-atomic="true">
+          <div className="processing-heading">
+            <div className="spinner" aria-hidden="true" />
+            <div><strong>{t("home.progress.title")}</strong><p>{statusText}</p></div>
+          </div>
+          <ProgressSteps activeId={activeStep} mode={mode} />
+          <p className="processing-note">{t("home.progress.note")}</p>
         </div>
       )}
 
