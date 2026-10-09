@@ -60,6 +60,9 @@ MAX_SEGMENTS              = int(os.getenv("MAX_SEGMENTS", 500))              # �
 # Un enregistrement envoie un segment toutes les ~5 min : bien plus large que
 # RATE_LIMIT_PROCESS (qui protège le démarrage d'un traitement), mais borné.
 RATE_LIMIT_SEGMENTS       = os.getenv("RATE_LIMIT_SEGMENTS", "60/minute")
+# Transcrire chaque segment dès qu'il arrive, pendant que la réunion continue : à la fin il ne
+# reste que le dernier segment et le résumé. Mettre à 0 pour tout traiter à la fin.
+RECORDING_EARLY_TRANSCRIPTION = os.getenv("RECORDING_EARLY_TRANSCRIPTION", "1").lower() not in ("0", "false", "no")
 
 # --- INITIALISATION GROQ ---
 api_key = os.environ.get("GROQ_API_KEY")

@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import (
     LANGUAGE, MAX_RECORDING_SIZE_MB, MAX_SEGMENT_SIZE_MB, MAX_SEGMENTS, RATE_LIMIT_PROCESS,
-    RATE_LIMIT_SEGMENTS, RECORDING_SEGMENT_SEC,
+    RATE_LIMIT_SEGMENTS, RECORDING_EARLY_TRANSCRIPTION, RECORDING_SEGMENT_SEC,
 )
 from app.i18n import SUPPORTED_LANGS, t
 from app.limiter import limiter
@@ -117,6 +117,10 @@ def envoyer_segment(
         raise HTTPException(
             status_code=413, detail=t("recording_too_large", lang, max_mb=MAX_RECORDING_SIZE_MB)
         )
+
+    # Transcrit ce segment tout de suite, pendant que la réunion continue.
+    if RECORDING_EARLY_TRANSCRIPTION:
+        transcribe.lancer_transcription_en_avance(rec_id, index)
 
     return {"index": index, "segments": recordings.indices_recus(rec_id)}
 

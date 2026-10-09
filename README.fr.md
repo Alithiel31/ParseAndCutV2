@@ -107,6 +107,7 @@ Nginx (conteneur frontend) sert les fichiers statiques du PWA et reverse-proxy `
 | `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Limite de requêtes sur `/api/transcribe/start` et sur la création/fin d'un enregistrement par segments (par IP), format `N/period` |
 | `RATE_LIMIT_SEGMENTS` | ❌ | `60/minute` | Limite d'envois de segments d'un enregistrement par segments (par IP, partagée entre tous les segments) |
 | `RECORDING_SEGMENT_SEC` | ❌ | `300` | Durée d'un segment d'enregistrement, annoncée au navigateur |
+| `RECORDING_EARLY_TRANSCRIPTION` | ❌ | `1` | Transcrit chaque segment dès son arrivée, pendant que la réunion continue (`0` pour tout traiter à la fin) |
 | `MAX_SEGMENT_SIZE_MB` | ❌ | `50` | Taille max d'un segment envoyé |
 | `MAX_RECORDING_SIZE_MB` | ❌ | `300` | Taille cumulée max des segments d'un enregistrement |
 | `MAX_SEGMENTS` | ❌ | `500` | Nombre max de segments d'un enregistrement |

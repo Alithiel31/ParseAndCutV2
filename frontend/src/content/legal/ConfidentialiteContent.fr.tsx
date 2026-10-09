@@ -115,7 +115,8 @@ export default function ConfidentialiteContentFr() {
           fermé, perte de connexion) ne fasse pas perdre toute la réunion. Ces segments restent
           dans le répertoire temporaire du serveur pendant l'enregistrement puis le traitement,
           et sont <strong>supprimés à la fin du traitement</strong> (ou dès que vous abandonnez
-          l'enregistrement). Un enregistrement jamais terminé est supprimé automatiquement{" "}
+          l'enregistrement). Chaque segment est transcrit dès son arrivée ; le texte obtenu est
+          conservé, au même endroit, jusqu'à la fin du traitement et supprimé avec les segments. Un enregistrement jamais terminé est supprimé automatiquement{" "}
           <strong>au bout de 6 heures au plus</strong>.
         </li>
         <li>

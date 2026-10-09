@@ -135,7 +135,7 @@ def _supprimer_fichier_entree(input_path: str) -> None:
 
 
 def _transcrire_et_structurer(
-    chunks: list[str],
+    chunks: list[Optional[str]],
     offsets: list[float],
     durée_audio_sec: Optional[float],
     début_traitement: float,
@@ -143,12 +143,18 @@ def _transcrire_et_structurer(
     lang: str,
     on_progress: Optional[Callable[..., None]],
     log_prefix: str,
+    déjà_transcrits: Optional[dict[int, Optional[tuple[str, list[dict]]]]] = None,
 ) -> dict:
     """Étapes communes à tous les points d'entrée une fois l'audio découpé en
     chunks : transcription chunk par chunk, puis résumé. `offsets[i]` est le
     début (en secondes) du chunk i dans l'enregistrement complet. Supprime
     chaque chunk dès qu'il est transcrit ; les restes sont à nettoyer par
-    l'appelant en cas d'exception."""
+    l'appelant en cas d'exception.
+
+    `déjà_transcrits[i]`, s'il existe, est le résultat d'une transcription faite à l'avance
+    (pendant l'enregistrement) : (texte, segments), ou None si ce chunk était silencieux. Le
+    chunk i n'a alors plus de fichier (`chunks[i]` vaut None) et ne coûte aucun appel."""
+    déjà_transcrits = déjà_transcrits or {}
     # --- 2. Transcription chunk par chunk ---
     logger.info(f"🎙️  {log_prefix}Transcription Whisper...")
     if on_progress:
@@ -160,17 +166,28 @@ def _transcrire_et_structurer(
     for i, path in enumerate(chunks):
         if on_progress:
             on_progress(chunk_current=i + 1)
-        logger.info(f"  {log_prefix}[{i+1}/{len(chunks)}] {os.path.basename(path)}")
 
-        # Un chunk de silence numérique (micro coupé) ferait halluciner
-        # Whisper et consommerait du quota Groq pour rien.
-        if est_silencieux(path):
-            logger.warning(f"  {log_prefix}chunk {i+1} silencieux — ignoré")
-            chunks_silencieux += 1
-            os.remove(path)
-            continue
+        if i in déjà_transcrits:
+            logger.info(f"  {log_prefix}[{i+1}/{len(chunks)}] déjà transcrit pendant l'enregistrement")
+            résultat = déjà_transcrits[i]
+            if résultat is None:
+                chunks_silencieux += 1
+                continue
+            texte_chunk, segments = résultat
+        else:
+            logger.info(f"  {log_prefix}[{i+1}/{len(chunks)}] {os.path.basename(path)}")
 
-        texte_chunk, segments = transcrire_chunk(path)
+            # Un chunk de silence numérique (micro coupé) ferait halluciner
+            # Whisper et consommerait du quota Groq pour rien.
+            if est_silencieux(path):
+                logger.warning(f"  {log_prefix}chunk {i+1} silencieux — ignoré")
+                chunks_silencieux += 1
+                os.remove(path)
+                continue
+
+            texte_chunk, segments = transcrire_chunk(path)
+            os.remove(path)  # Nettoyage immédiat après transcription
+
         texte_complet += texte_chunk + " "
 
         offset = offsets[i]
@@ -179,8 +196,6 @@ def _transcrire_et_structurer(
                 "start": seg["start"] + offset,
                 "text": seg["text"],
             })
-
-        os.remove(path)  # Nettoyage immédiat après transcription
 
         if on_progress:
             on_progress(partial_transcript=_formater_transcript(segments_horodatés))
@@ -316,22 +331,41 @@ def _executer_pipeline_segments(
     lang: str,
     on_progress: Optional[Callable[..., None]] = None,
     log_prefix: str = "",
+    rec_id: Optional[str] = None,
 ) -> dict:
     """Pipeline pour un enregistrement envoyé par segments : chaque segment
     (déjà court et autonome) devient un chunk MP3, sans nouveau découpage.
     Les décalages d'horodatage viennent de la durée réelle de chaque segment.
     Un segment illisible est ignoré (sa durée nominale est comptée pour garder
     les horodatages suivants à peu près justes) ; si aucun n'est lisible, échec.
-    Supprime ses propres chunks, pas les segments d'origine."""
-    chunks_créés: list[str] = []
+    Si `rec_id` est fourni, un segment déjà transcrit pendant l'enregistrement
+    (voir `_transcrire_segment_en_avance`) est réutilisé tel quel : ni conversion
+    ni appel Whisper. Supprime ses propres chunks, pas les segments d'origine."""
+    chunks_créés: list[Optional[str]] = []
     try:
         début_traitement = time.perf_counter()
         if on_progress:
             on_progress(step="cutting")
 
         offsets: list[float] = []
+        déjà_transcrits: dict[int, Optional[tuple[str, list[dict]]]] = {}
         position = 0.0
         for i, source in enumerate(segments):
+            à_l_avance = None
+            if rec_id is not None:
+                index = recordings.index_du_chemin(source)
+                à_l_avance = recordings.lire_resultat(rec_id, index) if index is not None else None
+
+            if à_l_avance is not None:
+                # Transcrit pendant la réunion : on garde le texte, la durée et le fait qu'il était silencieux.
+                déjà_transcrits[len(chunks_créés)] = (
+                    None if à_l_avance.get("silencieux") else (à_l_avance["texte"], à_l_avance["segments"])
+                )
+                chunks_créés.append(None)
+                offsets.append(position)
+                position += à_l_avance.get("durée") or RECORDING_SEGMENT_SEC
+                continue
+
             chunk = os.path.join(tempfile.gettempdir(), f"chunk_{pipeline_id}_{i}.mp3")
             if not convertir_en_mp3(source, chunk):
                 logger.warning(f"  {log_prefix}segment {i} illisible — ignoré")
@@ -344,15 +378,68 @@ def _executer_pipeline_segments(
         if not chunks_créés:
             raise _ErreurPipeline(422, t("ffmpeg_unreadable", lang))
 
-        logger.info(f"✅ {log_prefix}{len(chunks_créés)}/{len(segments)} segment(s) prêts à transcrire")
+        logger.info(
+            f"✅ {log_prefix}{len(chunks_créés)}/{len(segments)} segment(s) prêts "
+            f"({len(déjà_transcrits)} déjà transcrit(s) pendant l'enregistrement)"
+        )
         return _transcrire_et_structurer(
             chunks_créés, offsets, position, début_traitement, mode, lang, on_progress, log_prefix,
+            déjà_transcrits=déjà_transcrits,
         )
 
     finally:
         for path in chunks_créés:
-            if os.path.exists(path):
+            if path and os.path.exists(path):
                 os.remove(path)
+
+
+# Au plus 2 transcriptions anticipées simultanées par processus : à la reprise d'un enregistrement,
+# tous les segments arrivent d'un coup et ne doivent pas lancer autant d'appels Whisper en parallèle.
+_TRANSCRIPTIONS_EN_AVANCE = threading.BoundedSemaphore(2)
+# Attente maximale, à la fin, des transcriptions anticipées encore en cours.
+ATTENTE_TRANSCRIPTIONS_EN_AVANCE_SEC = 300
+
+
+def _transcrire_segment_en_avance(rec_id: str, index: int) -> None:
+    """Transcrit un segment dès son arrivée, en tâche de fond, et garde le résultat à côté du
+    segment. Toute erreur est avalée (sans résultat enregistré) : à la fin, le pipeline
+    retranscrira simplement ce segment lui-même. Le marqueur « en cours » est posé par l'appelant,
+    avant le lancement du thread, pour que la fin de l'enregistrement sache qu'il faut attendre."""
+    chunk = os.path.join(tempfile.gettempdir(), f"early_{rec_id}_{index}.mp3")
+    try:
+        with _TRANSCRIPTIONS_EN_AVANCE:
+            # Relevée AVANT la transcription : si le segment est renvoyé entre-temps, ce résultat
+            # périmé sera rejeté à la lecture.
+            signature = recordings.signature_segment(rec_id, index)
+            source = recordings.chemin_segment(rec_id, index)
+            if not signature or not source:
+                return
+            if not convertir_en_mp3(source, chunk):
+                return  # segment illisible : le pipeline final le signalera
+
+            durée = obtenir_duree_audio(chunk)
+            if est_silencieux(chunk):
+                recordings.sauver_resultat(rec_id, index, {"silencieux": True, "durée": durée}, signature)
+                return
+            texte, segments = transcrire_chunk(chunk)
+            recordings.sauver_resultat(
+                rec_id, index, {"silencieux": False, "durée": durée, "texte": texte, "segments": segments}, signature
+            )
+            logger.info(f"🎙️  Segment {index} de {rec_id[:8]} transcrit pendant l'enregistrement")
+    except Exception:
+        logger.warning(f"Transcription anticipée du segment {index} de {rec_id[:8]} impossible", exc_info=True)
+    finally:
+        if os.path.exists(chunk):
+            os.remove(chunk)
+        recordings.fin_en_cours(rec_id, index)
+
+
+def lancer_transcription_en_avance(rec_id: str, index: int) -> None:
+    """Lance la transcription anticipée du segment `index` en tâche de fond."""
+    if not client:
+        return
+    recordings.marquer_en_cours(rec_id, index)  # avant le thread : la fin ne doit pas passer entre deux
+    threading.Thread(target=_transcrire_segment_en_avance, args=(rec_id, index), daemon=True).start()
 
 
 def _traiter_enregistrement(job_id: str, rec_id: str, mode: str, lang: str) -> None:
@@ -360,10 +447,15 @@ def _traiter_enregistrement(job_id: str, rec_id: str, mode: str, lang: str) -> N
     `_traiter_job` (résultat ou erreur écrits dans le job), puis suppression de
     l'audio du serveur."""
     try:
+        # Une transcription anticipée encore en cours (typiquement celle du dernier segment, reçu
+        # juste avant la fin) est attendue plutôt que refaite.
+        if not recordings.attendre_en_cours(rec_id, ATTENTE_TRANSCRIPTIONS_EN_AVANCE_SEC):
+            logger.warning(f"[job {job_id}] transcriptions anticipées trop longues : le reste est fait ici")
         résultat = _executer_pipeline_segments(
             recordings.chemins_ordonnes(rec_id), job_id, mode, lang,
             on_progress=lambda **champs: update_job(job_id, **champs),
             log_prefix=f"[job {job_id}] ",
+            rec_id=rec_id,
         )
         update_job(job_id, status="done", result=résultat)
 
