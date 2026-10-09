@@ -5,6 +5,8 @@ import ProgressSteps, { STEPS } from "../components/ProgressSteps";
 import ResultView from "../components/ResultView";
 import { ApiError, cancelRecording, resumeTranscription, transcribeAudio, transcribeRecording, type JobProgress, type TranscribeMode, type TranscribeResult } from "../api";
 import { useLanguage, useTranslation, type Lang } from "../i18n";
+import RecoveryBanner from "../components/RecoveryBanner";
+import { discardInterrupted, findInterruptedRecordings, forgetLocalRecording, processInterrupted, type InterruptedRecording } from "../recovery";
 import type { RecordedUpload } from "../segmentedRecording";
 import { getPermission, isNotificationSupported, notifyResult, requestPermission } from "../notifications";
 
@@ -64,8 +66,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TranscribeResult | null>(null);
   const [partialTranscript, setPartialTranscript] = useState<string | null>(null);
-  // Enregistrement micro déjà entièrement envoyé par segments (le fichier concerné est gardé pour le repérer).
+  // Sauvegarde par segments de l'enregistrement micro courant (le fichier concerné est gardé pour le repérer).
   const [recordingUpload, setRecordingUpload] = useState<{ file: File; upload: RecordedUpload } | null>(null);
+  // Enregistrements interrompus retrouvés sur l'appareil (le plus récent d'abord).
+  const [interrupted, setInterrupted] = useState<InterruptedRecording[]>([]);
   const [isResumed, setIsResumed] = useState(false);
   const [recorderBusy, setRecorderBusy] = useState(false);
   const [notifyEnabled, setNotifyEnabled] = useState(() => {
@@ -102,13 +106,26 @@ export default function Home() {
     }
   }, [phase]);
 
-  // Un autre fichier remplace l'enregistrement : sa copie sur le serveur ne servira plus.
+  // Un autre fichier (ou un nouvel enregistrement) remplace celui-ci : ses copies ne serviront plus.
   useEffect(() => {
     if (recordingUpload && recordingUpload.file !== file) {
-      void cancelRecording(recordingUpload.upload.recordingId, lang);
+      const { recordingId, localId } = recordingUpload.upload;
+      if (recordingId) void cancelRecording(recordingId, lang);
+      void forgetLocalRecording(localId);
       setRecordingUpload(null);
     }
   }, [file, recordingUpload, lang]);
+
+  // Au chargement : un enregistrement interrompu (onglet planté, page quittée…) est-il resté sur l'appareil ?
+  useEffect(() => {
+    let active = true;
+    void findInterruptedRecordings().then((found) => {
+      if (active) setInterrupted(found);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (restoreStartedRef.current) return;
@@ -177,6 +194,39 @@ export default function Home() {
     setPhase("error");
   }
 
+  async function handleResumeInterrupted() {
+    const item = interrupted[0];
+    if (!item || loading || recorderBusy) return;
+    setError(null);
+    setResult(null);
+    setPartialTranscript(null);
+    setPhase("loading");
+    setIsResumed(false);
+    setActiveStep(STEPS[0].id);
+    setStatusText(t("home.status.uploading"));
+
+    try {
+      const data = await processInterrupted(item, {
+        mode,
+        lang,
+        onUploadProgress: (sent, total) => setStatusText(t("recovery.status.uploading", { sent, total })),
+        onProgress: handleProgress,
+        onJobStarted: (jobId) => savePendingJob({ jobId, mode, lang }),
+      });
+      setInterrupted((current) => current.slice(1));
+      handleResult(data, mode);
+    } catch (e) {
+      handleJobError(e);
+    }
+  }
+
+  async function handleDiscardInterrupted() {
+    const item = interrupted[0];
+    if (!item || !window.confirm(t("recovery.discardConfirm"))) return;
+    await discardInterrupted(item, lang);
+    setInterrupted((current) => current.slice(1));
+  }
+
   async function handleSubmit() {
     if (recorderBusy) return;
     if (!file) {
@@ -191,13 +241,17 @@ export default function Home() {
     setActiveStep(STEPS[0].id);
     setStatusText(t("home.status.uploading"));
 
-    const onJobStarted = (jobId: string) => savePendingJob({ jobId, mode, lang });
     const segmented = recordingUpload && recordingUpload.file === file ? recordingUpload.upload : null;
+    const onJobStarted = (jobId: string) => {
+      savePendingJob({ jobId, mode, lang });
+      // Le traitement a démarré : la sauvegarde locale de l'enregistrement n'a plus d'utilité.
+      if (segmented) void forgetLocalRecording(segmented.localId);
+    };
     setRecordingUpload(null);
 
     try {
       let data: TranscribeResult;
-      if (segmented) {
+      if (segmented?.complete && segmented.recordingId) {
         try {
           // Déjà sur le serveur : on lance le traitement sans renvoyer le fichier.
           data = await transcribeRecording(segmented.recordingId, mode, lang, handleProgress, onJobStarted);
@@ -241,6 +295,16 @@ export default function Home() {
           }
         />
 
+        {interrupted.length > 0 && !loading && !recorderBusy && (
+          <RecoveryBanner
+            item={interrupted[0]}
+            moreCount={interrupted.length - 1}
+            busy={controlsDisabled}
+            onResume={handleResumeInterrupted}
+            onDiscard={handleDiscardInterrupted}
+          />
+        )}
+
         <div className="source-divider"><span>{t("home.source.or")}</span></div>
         <AudioRecorder
           disabled={loading}
@@ -251,7 +315,7 @@ export default function Home() {
           }}
           onFileReady={(recording, upload) => {
             setFile(recording);
-            setRecordingUpload(upload?.complete ? { file: recording, upload } : null);
+            setRecordingUpload(upload ? { file: recording, upload } : null);
             setError(null);
           }}
         />

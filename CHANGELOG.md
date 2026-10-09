@@ -41,6 +41,14 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
   the server, processing starts without re-uploading the file; if the backup is unavailable or
   incomplete, the full recording is uploaded as before, so nothing depends on it. The next segment
   is started before the previous one is stopped, so there is no gap at segment boundaries
+- Interrupted recordings can be resumed: the audio recorded so far (finished segments plus
+  one-second pieces of the segment in progress) is saved on the device in IndexedDB. After a tab
+  crash, a reload or leaving the page, the home page offers to resume and process it (all segments
+  are re-sent to a fresh server session, so it works even if the previous one expired) or to delete it.
+  At most ~1 s of audio is lost. The local copy is deleted once processing has started, or after 24 h
+- Privacy pages and footer updated to match what is actually stored: audio segments on the server
+  until processing ends (6 h max if a recording is abandoned), the result file until retrieved
+  (2 h max), and the local-storage / IndexedDB entries on the device
 
 ### Removed
 

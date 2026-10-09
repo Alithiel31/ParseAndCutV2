@@ -11,7 +11,7 @@ interface AudioRecorderProps {
   disabled: boolean;
   onActivityChange: (active: boolean) => void;
   onRecordingStart: () => void;
-  // `upload` : l'enregistrement est déjà entièrement sur le serveur (par segments).
+  // `upload` : état de la sauvegarde par segments (`complete` : tout est déjà sur le serveur).
   // Absent, c'est le fichier complet qu'il faudra envoyer.
   onFileReady: (file: File, upload?: RecordedUpload) => void;
 }
@@ -71,7 +71,9 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
 
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
-    segmentsRef.current?.discard();
+    // Page quittée en pleine réunion : l'audio déjà enregistré reste sur l'appareil et
+    // sera proposé à la reprise au prochain affichage.
+    segmentsRef.current?.detach();
     void releaseWakeLock();
   }, []);
 
@@ -131,7 +133,7 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
     if (disabled || phase === "preparing" || phase === "recording" || phase === "paused" || phase === "stopping") return;
     setError(null);
     setAnnouncement("");
-    // Un enregistrement précédent non utilisé : on libère aussi sa copie sur le serveur.
+    // Un enregistrement précédent non terminé : on libère ses copies (serveur et appareil).
     segmentsRef.current?.discard();
     segmentsRef.current = null;
     setSyncStatus(null);
@@ -189,7 +191,8 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
         segmentsRef.current = null;
 
         if (sizeExceededRef.current || recorderFailedRef.current || blob.size === 0) {
-          segments?.discard();
+          // On garde la sauvegarde par segments : elle peut encore être reprise depuis l'accueil.
+          segments?.detach();
           closeStream();
           onActivityChange(false);
           if (!sizeExceededRef.current && !recorderFailedRef.current) setError(t("recorder.error.empty"));
@@ -200,11 +203,11 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
 
         // Les segments s'arrêtent AVANT la fermeture du micro, puis on attend brièvement
         // l'envoi du dernier : sinon la fermeture des pistes couperait le dernier segment.
-        let upload = (await segments?.stop()) ?? null;
+        const upload = (await segments?.stop()) ?? null;
         if (upload && !upload.complete) {
-          // Envoi incomplet : le fichier complet fera foi, la copie partielle est inutile.
-          segments?.discard();
-          upload = null;
+          // Envoi incomplet : le fichier complet fera foi. La copie serveur partielle est
+          // inutile, mais la sauvegarde locale reste jusqu'au démarrage du traitement.
+          segments?.abandonServerCopy();
         }
         closeStream();
         onActivityChange(false);
