@@ -3,8 +3,9 @@ import DropZone from "../components/DropZone";
 import AudioRecorder from "../components/AudioRecorder";
 import ProgressSteps, { STEPS } from "../components/ProgressSteps";
 import ResultView from "../components/ResultView";
-import { ApiError, resumeTranscription, transcribeAudio, type JobProgress, type TranscribeMode, type TranscribeResult } from "../api";
+import { ApiError, cancelRecording, resumeTranscription, transcribeAudio, transcribeRecording, type JobProgress, type TranscribeMode, type TranscribeResult } from "../api";
 import { useLanguage, useTranslation, type Lang } from "../i18n";
+import type { RecordedUpload } from "../segmentedRecording";
 import { getPermission, isNotificationSupported, notifyResult, requestPermission } from "../notifications";
 
 type Phase = "idle" | "loading" | "done" | "error";
@@ -63,6 +64,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TranscribeResult | null>(null);
   const [partialTranscript, setPartialTranscript] = useState<string | null>(null);
+  // Enregistrement micro déjà entièrement envoyé par segments (le fichier concerné est gardé pour le repérer).
+  const [recordingUpload, setRecordingUpload] = useState<{ file: File; upload: RecordedUpload } | null>(null);
   const [isResumed, setIsResumed] = useState(false);
   const [recorderBusy, setRecorderBusy] = useState(false);
   const [notifyEnabled, setNotifyEnabled] = useState(() => {
@@ -98,6 +101,14 @@ export default function Home() {
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
     }
   }, [phase]);
+
+  // Un autre fichier remplace l'enregistrement : sa copie sur le serveur ne servira plus.
+  useEffect(() => {
+    if (recordingUpload && recordingUpload.file !== file) {
+      void cancelRecording(recordingUpload.upload.recordingId, lang);
+      setRecordingUpload(null);
+    }
+  }, [file, recordingUpload, lang]);
 
   useEffect(() => {
     if (restoreStartedRef.current) return;
@@ -180,10 +191,24 @@ export default function Home() {
     setActiveStep(STEPS[0].id);
     setStatusText(t("home.status.uploading"));
 
+    const onJobStarted = (jobId: string) => savePendingJob({ jobId, mode, lang });
+    const segmented = recordingUpload && recordingUpload.file === file ? recordingUpload.upload : null;
+    setRecordingUpload(null);
+
     try {
-      const data = await transcribeAudio(file, mode, lang, handleProgress, (jobId) =>
-        savePendingJob({ jobId, mode, lang })
-      );
+      let data: TranscribeResult;
+      if (segmented) {
+        try {
+          // Déjà sur le serveur : on lance le traitement sans renvoyer le fichier.
+          data = await transcribeRecording(segmented.recordingId, mode, lang, handleProgress, onJobStarted);
+        } catch (e) {
+          // Enregistrement expiré (404) ou incomplet (409) : le fichier complet reste disponible.
+          if (!(e instanceof ApiError) || (e.status !== 404 && e.status !== 409)) throw e;
+          data = await transcribeAudio(file, mode, lang, handleProgress, onJobStarted);
+        }
+      } else {
+        data = await transcribeAudio(file, mode, lang, handleProgress, onJobStarted);
+      }
       handleResult(data, mode);
     } catch (e) {
       handleJobError(e);
@@ -224,8 +249,9 @@ export default function Home() {
             setFile(null);
             setError(null);
           }}
-          onFileReady={(recording) => {
+          onFileReady={(recording, upload) => {
             setFile(recording);
+            setRecordingUpload(upload?.complete ? { file: recording, upload } : null);
             setError(null);
           }}
         />

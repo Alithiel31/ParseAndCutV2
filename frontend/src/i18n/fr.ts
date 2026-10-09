@@ -68,6 +68,8 @@ const fr = {
   "recorder.error.tooLarge": "La limite de {maxMb} Mo est atteinte. Arrêtez et utilisez un enregistrement plus court.",
   "recorder.error.empty": "Aucun son n’a été enregistré. Vérifiez le micro et réessayez.",
   "recorder.status.recording": "Enregistrement démarré.",
+  "recorder.sync.progress": "Sauvegarde sécurisée : {sent}/{total} segments envoyés au serveur.",
+  "recorder.sync.failed": "La sauvegarde en ligne est indisponible : l’enregistrement continue sur cet appareil.",
   "recorder.hint.keepAwake": "Gardez cet écran allumé et l’onglet au premier plan pendant l’enregistrement.",
   "recorder.warning.micMuted": "Le micro est coupé : le navigateur ne capte plus le son (écran verrouillé, changement d’application ?). Revenez sur cet écran — ce passage n’est pas enregistré.",
   "recorder.status.paused": "Enregistrement mis en pause.",

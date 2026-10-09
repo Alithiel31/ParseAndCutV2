@@ -35,7 +35,12 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
   assembled and processed by the same pipeline and job tracking as a regular upload; a missing
   segment is reported (HTTP 409 + `missing`) so the client can resend it. Upload requests are
   idempotent per segment. The audio is stored on the server only until processing ends (or 6 h
-  if abandoned). Backend part only for now; the frontend is not using it yet
+  if abandoned)
+- The in-browser recorder now also records the microphone in 5-minute segments and uploads them
+  while the meeting is running (progress shown as "x/y segments sent"). When all segments are on
+  the server, processing starts without re-uploading the file; if the backup is unavailable or
+  incomplete, the full recording is uploaded as before, so nothing depends on it. The next segment
+  is started before the previous one is stopped, so there is no gap at segment boundaries
 
 ### Removed
 
