@@ -3,17 +3,49 @@ Transcription des chunks audio via l'API Groq Whisper.
 """
 import os
 import time
+from typing import Optional
 
-from groq import APIError, APITimeoutError
+from groq import (
+    APIConnectionError,
+    APIError,
+    APITimeoutError,
+    InternalServerError,
+    RateLimitError,
+)
 
 from app.config import client, logger
 
+# Erreurs transitoires : réseau/timeout, quota dépassé (429) et erreurs serveur
+# Groq (5xx). Tout le reste (clé invalide, fichier refusé…) échouera à
+# l'identique à chaque essai, donc n'est jamais retenté.
+_ERREURS_TRANSITOIRES = (APIConnectionError, RateLimitError, InternalServerError)
 
-def transcrire_chunk(path: str, retries: int = 2) -> tuple[str, list[dict]]:
+MAX_TENTATIVES = 5
+ATTENTE_MAX_SEC = 120  # plafond d'une attente, même si Groq demande plus
+
+
+def _delai_attente(exc: APIError, tentative: int) -> float:
+    """Délai avant la prochaine tentative : `retry-after` de Groq s'il est
+    fourni (cas d'un 429), sinon backoff exponentiel (1s, 2s, 4s…). Plafonné à
+    ATTENTE_MAX_SEC pour qu'un job ne reste pas bloqué indéfiniment."""
+    retry_after: Optional[str] = None
+    response = getattr(exc, "response", None)
+    if response is not None:
+        retry_after = response.headers.get("retry-after")
+    try:
+        delai = float(retry_after) if retry_after is not None else 2 ** tentative
+    except ValueError:
+        delai = 2 ** tentative
+    return min(max(delai, 1.0), ATTENTE_MAX_SEC)
+
+
+def transcrire_chunk(path: str, retries: int = MAX_TENTATIVES) -> tuple[str, list[dict]]:
     """
     Transcrit un chunk audio via Groq Whisper.
-    Retente automatiquement avec backoff exponentiel en cas de timeout.
-    2 tentatives max pour rester dans le timeout serveur (300s).
+    Retente automatiquement (timeout, coupure réseau, 429, 5xx) en respectant
+    le `retry-after` de Groq quand il est fourni, sinon avec backoff
+    exponentiel. Le traitement tourne en tâche de fond (jobs asynchrones) :
+    il n'y a plus de limite de réponse HTTP à respecter ici.
 
     La langue parlée est toujours auto-détectée par Whisper (language=None),
     indépendamment de la langue de sortie choisie par l'utilisateur pour la
@@ -24,11 +56,14 @@ def transcrire_chunk(path: str, retries: int = 2) -> tuple[str, list[dict]]:
     passages horodatés : [{"start": float, "end": float, "text": str}, ...]
     (temps en secondes, relatifs au début de ce chunk).
     """
+    nom = os.path.basename(path)
+    dernière_erreur: Optional[Exception] = None
+
     for attempt in range(retries):
         try:
             with open(path, "rb") as f:
                 result = client.audio.transcriptions.create(
-                    file=(os.path.basename(path), f.read()),
+                    file=(nom, f.read()),
                     model="whisper-large-v3",
                     language=None,
                     response_format="verbose_json"
@@ -41,11 +76,14 @@ def transcrire_chunk(path: str, retries: int = 2) -> tuple[str, list[dict]]:
             ]
             return result.text, segments
 
-        except APITimeoutError:
-            wait = 2 ** attempt  # 1s puis 2s
+        except (APITimeoutError, *_ERREURS_TRANSITOIRES) as e:
+            dernière_erreur = e
+            if attempt + 1 >= retries:
+                break
+            wait = _delai_attente(e, attempt)
             logger.warning(
-                f"  Timeout chunk {os.path.basename(path)}, "
-                f"tentative {attempt + 1}/{retries} — attente {wait}s"
+                f"  {type(e).__name__} sur le chunk {nom}, "
+                f"tentative {attempt + 1}/{retries} — attente {wait:.0f}s"
             )
             time.sleep(wait)
 
@@ -54,5 +92,6 @@ def transcrire_chunk(path: str, retries: int = 2) -> tuple[str, list[dict]]:
             raise
 
     raise RuntimeError(
-        f"Transcription échouée après {retries} tentatives pour {os.path.basename(path)}"
+        f"Transcription échouée après {retries} tentatives pour {nom} "
+        f"({type(dernière_erreur).__name__})"
     )
