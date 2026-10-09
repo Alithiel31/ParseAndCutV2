@@ -80,7 +80,8 @@ def valider_lang_et_mode(lang: str, mode: str) -> None:
     """Valide lang/client/mode d'une requête qui lance un traitement (fichier
     complet ou fin d'enregistrement). Lève HTTPException sinon."""
     if lang not in SUPPORTED_LANGS:
-        raise HTTPException(status_code=400, detail=t("invalid_lang", lang))
+        # Langue inconnue : le message sort dans la langue configurée du serveur.
+        raise HTTPException(status_code=400, detail=t("invalid_lang", LANGUAGE))
 
     if not client:
         raise HTTPException(status_code=503, detail=t("groq_not_configured", lang))
