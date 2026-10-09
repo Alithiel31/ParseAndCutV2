@@ -49,7 +49,7 @@ class TestTranscrireChunk:
 
     def test_langue_toujours_auto_detectee(self, monkeypatch, tmp_path):
         # La langue parlée est toujours auto-détectée par Whisper (language=None),
-        # indépendamment de la langue de sortie choisie côté /process.
+        # indépendamment de la langue de sortie choisie pour la fiche.
         fake_chunk = tmp_path / "chunk.mp3"
         fake_chunk.write_bytes(b"faux audio")
 

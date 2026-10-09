@@ -2,11 +2,10 @@
 Tests du flux asynchrone (app.routers.transcribe : /api/transcribe/start +
 /api/transcribe/status/{job_id}).
 
-Ce flux existe pour contourner le timeout fixe de 100s imposé par Cloudflare
-sur les requêtes proxyées (voir docs/Troubleshooting.fr.md) : /process reste
-synchrone (et testé séparément dans test_transcribe.py) pour ne pas casser
-les clients existants (PWA), mais le pipeline y est trop long pour un fichier
-de plus de quelques minutes d'audio derrière le tunnel Cloudflare.
+Ce flux (le seul point d'entrée de transcription) existe pour contourner le
+timeout fixe de 100s imposé par Cloudflare sur les requêtes proxyées (voir
+docs/Troubleshooting.fr.md) : le pipeline est trop long pour tenir dans une
+seule requête dès quelques minutes d'audio.
 
 Le traitement réel tourne dans un thread en tâche de fond : les tests
 attendent la fin du job en sondant /status en boucle (le pipeline est mocké,

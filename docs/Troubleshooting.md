@@ -18,7 +18,7 @@ The code was changed in several successive passes (commits `db7cfa6` "deploy tro
 
 1. Switched from `os.getenv("GROQ_API_KEY")` to `os.environ.get("GROQ_API_KEY")` to read the key.
 2. Added a log printing the first 5 characters of the key when it is read successfully, to visually confirm in the Railway logs that the variable reaches the process.
-3. **Defensive Groq client initialization**: the client is no longer instantiated at module load time when the key is missing — the app no longer crashes on boot, and a missing client is handled explicitly in the `/process` route (a clear error is returned instead of a crash).
+3. **Defensive Groq client initialization**: the client is no longer instantiated at module load time when the key is missing — the app no longer crashes on boot, and a missing client is handled explicitly when a job is started (a clear error is returned instead of a crash).
 
 ```python
 # before
@@ -125,8 +125,8 @@ The pipeline was made asynchronous: `POST /api/transcribe/start` saves the file 
 immediately (202 + `job_id`) while processing runs in the background on the Pi; the frontend then
 polls `GET /api/transcribe/status/{job_id}` every ~3s until it gets a terminal status. Each
 individual request stays fast (well under 100s), only the background processing can take as long
-as it needs. The old synchronous endpoint (`/process` and the `/api/transcribe` alias) is kept
-as-is so as not to break any other API clients (e.g. the separate PWA).
+as it needs. The old synchronous endpoint (`/process` and the `/api/transcribe` alias) has since
+been removed: it could not work behind Cloudflare for anything but very short audio.
 
 ### Note for the current deployment
 

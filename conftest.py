@@ -18,7 +18,7 @@ from app.limiter import limiter  # noqa: E402
 @pytest.fixture(autouse=True)
 def _reset_rate_limiter():
     """Le TestClient partage toujours la même IP factice ('testclient') : sans
-    reset, les appels répétés à /process entre tests dépasseraient RATE_LIMIT_PROCESS
+    reset, les appels répétés à /api/transcribe/start entre tests dépasseraient RATE_LIMIT_PROCESS
     et casseraient des tests qui ne testent pas le rate limiting lui-même."""
     limiter.reset()
     yield

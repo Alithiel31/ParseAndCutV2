@@ -18,7 +18,7 @@ Le code a été modifié en plusieurs passes successives (commits `db7cfa6` « d
 
 1. Passage de `os.getenv("GROQ_API_KEY")` à `os.environ.get("GROQ_API_KEY")` pour la lecture de la clé.
 2. Ajout d'un log affichant les 5 premiers caractères de la clé si elle est bien lue, pour confirmer visuellement dans les logs Railway que la variable arrive au process.
-3. **Initialisation prudente du client Groq** : le client n'est plus instancié au chargement du module si la clé est absente — l'app ne crashe donc plus au boot, et l'absence de client est gérée explicitement dans la route `/process` (retour d'une erreur claire plutôt qu'un crash).
+3. **Initialisation prudente du client Groq** : le client n'est plus instancié au chargement du module si la clé est absente — l'app ne crashe donc plus au boot, et l'absence de client est gérée explicitement au démarrage d'un job (retour d'une erreur claire plutôt qu'un crash).
 
 ```python
 # avant
@@ -130,8 +130,8 @@ répond immédiatement (202 + `job_id`) pendant que le traitement tourne en tâc
 Pi ; le frontend interroge ensuite `GET /api/transcribe/status/{job_id}` toutes les ~3s jusqu'à
 obtenir un statut terminal. Chaque requête individuelle reste rapide (bien sous 100s), seul le
 traitement de fond peut prendre le temps qu'il faut. L'ancien endpoint synchrone (`/process` et
-l'alias `/api/transcribe`) est conservé tel quel pour ne pas casser d'éventuels autres clients de
-l'API (ex. la PWA séparée).
+l'alias `/api/transcribe`) a depuis été supprimé : il ne pouvait pas fonctionner derrière
+Cloudflare au-delà d'un audio très court.
 
 ### Point de vigilance pour l'hébergement actuel
 

@@ -15,8 +15,26 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
   synchronous `/process`/`/api/transcribe` pipeline (splitting + sequential Whisper calls per
   chunk + LLM summary) couldn't finish in time — see [`docs/Troubleshooting.md`](./docs/Troubleshooting.md#3-long-files-10-15-min-http-524-despite-being-under-the-size-limit).
   The frontend now shows real per-chunk transcription progress instead of a fixed-timing
-  simulation. The old synchronous endpoints are kept unchanged for backward compatibility with
-  other API clients (e.g. the separate PWA)
+  simulation
+- Transcription is now more robust on long recordings (meetings of 1-2 h):
+  - transient Groq errors (429 quota, 5xx, network) are retried, honoring `retry-after`
+    (`app/services/groq_retry.py`), for both Whisper and LLM calls;
+  - the text already transcribed is kept and returned (`partial_transcript`) when a job fails
+    midway, and shown by the frontend;
+  - silent chunks (e.g. microphone muted by the browser) are no longer sent to Whisper, and
+    Whisper hallucinations on silence/noise ("you", "Sous-titrage Société Radio-Canada"…) are
+    filtered; a fully silent recording fails with an explicit message;
+  - long transcripts (> 30,000 characters) are summarized in two steps (detailed notes per
+    block, then a merge) instead of one capped prompt, with step progress in the UI.
+- The audio recorder keeps the screen on (Screen Wake Lock) and warns immediately if the browser
+  mutes the microphone, which silently produced empty recordings on Android when the screen turned off
+
+### Removed
+
+- **Breaking:** the synchronous `POST /process` and `POST /api/transcribe` endpoints. They could
+  not complete behind Cloudflare's 100 s edge timeout for anything but very short audio, and the
+  frontend no longer uses them. Use `POST /api/transcribe/start` + `GET /api/transcribe/status/{job_id}`.
+  The `RATE_LIMIT_PROCESS` variable keeps its name and now applies to `/api/transcribe/start`
 
 ## [1.2.0] - 2026-09-01
 

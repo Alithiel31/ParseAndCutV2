@@ -3,15 +3,15 @@
 Script de benchmark pour l'API de transcription ParseAndCutV2.
 
 Mesure, sur un ensemble de fichiers audio de test, le ratio "durée audio
-traitée" / "temps de traitement serveur" renvoyé par /api/transcribe
-(champs stats.audio_duration_sec et stats.processing_time_sec), afin
+traitée" / "temps de traitement serveur" renvoyé par /api/transcribe/start
++ /status (champs stats.audio_duration_sec et stats.processing_time_sec), afin
 d'obtenir un chiffre communicable ("X minutes d'audio transcrites en Y
 secondes") et une estimation du temps de transcription manuelle évité.
 
 Usage
 -----
     python scripts/benchmark_transcription.py DOSSIER_AUDIO \\
-        [--url http://localhost:5000/api/transcribe] \\
+        [--url http://localhost:5000/api/transcribe/start] \\
         [--mode summary|transcript] \\
         [--repeats 3] \\
         [--manual-ratio 5.0] \\
@@ -52,22 +52,36 @@ def _formater_duree(secondes: float) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
 
 
+POLL_INTERVAL_SEC = 3
+
+
 def transcrire_un_fichier(client: httpx.Client, url: str, path: Path, mode: str) -> Optional[dict]:
-    """Envoie un fichier à l'API et retourne son bloc `stats` (ou None en cas d'échec)."""
-    with open(path, "rb") as f:
-        files = {"audio": (path.name, f, "application/octet-stream")}
-        data = {"mode": mode}
-        try:
-            resp = client.post(url, files=files, data=data)
-        except httpx.RequestError as e:
-            print(f"  ⚠️  {path.name} : erreur réseau ({e})", file=sys.stderr)
+    """Envoie un fichier à l'API (POST .../start), attend la fin du job en
+    sondant .../status/{job_id}, et retourne son bloc `stats` (ou None en cas d'échec)."""
+    status_url = url.rsplit("/start", 1)[0] + "/status/"
+
+    try:
+        with open(path, "rb") as f:
+            files = {"audio": (path.name, f, "application/octet-stream")}
+            start = client.post(url, files=files, data={"mode": mode})
+
+        if start.status_code != 202:
+            print(f"  ⚠️  {path.name} : HTTP {start.status_code} — {start.text[:200]}", file=sys.stderr)
             return None
 
-    if resp.status_code != 200:
-        print(f"  ⚠️  {path.name} : HTTP {resp.status_code} — {resp.text[:200]}", file=sys.stderr)
+        job_id = start.json()["job_id"]
+        while True:
+            time.sleep(POLL_INTERVAL_SEC)
+            resp = client.get(status_url + job_id)
+            if resp.status_code != 200:
+                print(f"  ⚠️  {path.name} : HTTP {resp.status_code} — {resp.text[:200]}", file=sys.stderr)
+                return None
+            corps = resp.json()
+            if corps.get("status") == "done":
+                return corps.get("stats", {})
+    except httpx.RequestError as e:
+        print(f"  ⚠️  {path.name} : erreur réseau ({e})", file=sys.stderr)
         return None
-
-    return resp.json().get("stats", {})
 
 
 def benchmarker_fichier(client: httpx.Client, url: str, path: Path, mode: str, repeats: int) -> Optional[dict]:
@@ -153,7 +167,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark de l'API de transcription ParseAndCutV2.")
     parser.add_argument("dossier", type=Path, help="Dossier contenant les fichiers audio de test")
     parser.add_argument(
-        "--url", default="http://localhost:5000/api/transcribe", help="URL de l'API (défaut: %(default)s)"
+        "--url", default="http://localhost:5000/api/transcribe/start", help="URL de démarrage de l'API (défaut: %(default)s)"
     )
     parser.add_argument(
         "--mode", default="summary", choices=["summary", "transcript"],

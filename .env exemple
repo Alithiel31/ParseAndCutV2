@@ -19,5 +19,5 @@ CORS_ORIGINS=http://localhost:5173
 # pour les requêtes proxyées — Free/Pro ; en plus des 500 Mo côté nginx).
 MAX_UPLOAD_SIZE_MB=100
 
-# Limite de requêtes sur /process, format "N/period" (ex: "5/minute").
+# Limite de requêtes sur /api/transcribe/start, format "N/period" (ex: "5/minute").
 RATE_LIMIT_PROCESS=5/minute

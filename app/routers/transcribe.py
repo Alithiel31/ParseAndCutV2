@@ -1,12 +1,15 @@
 """
 Routes de transcription : upload audio -> découpage -> transcription -> fiche Markdown.
+
+Le traitement est toujours asynchrone (POST /api/transcribe/start puis
+GET /api/transcribe/status/{job_id}) : une réponse HTTP unique dépasserait le
+timeout de 100 s de Cloudflare dès quelques minutes d'audio.
 """
 import os
 import subprocess
 import tempfile
 import threading
 import time
-import uuid
 from typing import Callable, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -66,8 +69,8 @@ def _formater_transcript(segments: list[dict]) -> str:
 
 
 def _valider_requete(lang: str, audio: Optional[UploadFile], mode: str) -> None:
-    """Valide lang/client/audio/mode communs aux deux points d'entrée
-    (synchrone et asynchrone). Lève HTTPException sinon."""
+    """Valide lang/client/audio/mode de la requête de démarrage. Lève
+    HTTPException sinon."""
     if lang not in SUPPORTED_LANGS:
         raise HTTPException(status_code=400, detail=t("invalid_lang", lang))
 
@@ -99,8 +102,8 @@ class _ErreurPipeline(Exception):
 
 def _traduire_erreur(exc: Exception, lang: str) -> tuple[int, str]:
     """Convertit une exception du pipeline en (code HTTP, message traduit).
-    Partagé par la route synchrone (qui en fait une HTTPException) et par le
-    job de fond (qui l'écrit comme statut final du job)."""
+    Le job de fond l'écrit comme statut final du job ; le endpoint de statut
+    la retraduit en réponse HTTP quand le client la récupère."""
     if isinstance(exc, _ErreurPipeline):
         return exc.http_status, exc.detail
 
@@ -136,8 +139,7 @@ def _executer_pipeline(
 ) -> dict:
     """Pipeline complet : découpage -> transcription chunk par chunk -> résumé.
 
-    Commun à la route synchrone et au job de fond. Retourne le corps de la
-    réponse ; lève `_ErreurPipeline` (ou l'exception d'origine) en cas
+    Retourne le corps de la réponse ; lève `_ErreurPipeline` (ou l'exception d'origine) en cas
     d'échec, à charge pour l'appelant de la traduire via `_traduire_erreur`.
     `on_progress(**champs)`, si fourni, reçoit l'étape courante (step,
     chunk_total, chunk_current) et, après chaque chunk transcrit, la
@@ -255,50 +257,6 @@ def _executer_pipeline(
                 logger.debug(f"Chunk supprimé : {path}")
 
 
-@router.post('/process')
-@router.post('/api/transcribe')  # alias explicite pour les clients API/PWA
-@limiter.limit(RATE_LIMIT_PROCESS)
-def process(
-    request: Request,
-    audio: Optional[UploadFile] = File(None),
-    mode: str = Form("summary"),
-    lang: str = Form(LANGUAGE),
-):
-
-    # --- Vérifications préalables ---
-    # `lang` est validé en premier : tous les messages d'erreur suivants
-    # doivent être dans une langue confirmée.
-    _valider_requete(lang, audio, mode)
-
-    # --- Sauvegarde sécurisée ---
-    filename = secure_filename(audio.filename)
-    if not filename:
-        # Fallback si le nom contient uniquement des caractères non-ASCII
-        filename = f"audio_{os.getpid()}.mp3"
-
-    # Identifiant unique par requête (pas le PID : avec plusieurs workers/threads,
-    # deux requêtes concurrentes peuvent partager le même PID et donc, si le PID
-    # seul suffisait, écraser/lire le fichier temporaire l'une de l'autre en cas
-    # de nom de fichier identique — ex. deux utilisateurs uploadant "cours.mp3"
-    # en même temps).
-    request_id = uuid.uuid4().hex
-    input_path = os.path.join(tempfile.gettempdir(), f"{request_id}_{filename}")
-
-    try:
-        _sauvegarder_avec_limite(audio.file, input_path, MAX_UPLOAD_SIZE_BYTES, lang)
-        return JSONResponse(_executer_pipeline(input_path, request_id, mode, lang))
-
-    except HTTPException:
-        raise
-
-    except Exception as exc:
-        status, detail = _traduire_erreur(exc, lang)
-        raise HTTPException(status_code=status, detail=detail)
-
-    finally:
-        _supprimer_fichier_entree(input_path)
-
-
 def _traiter_job(job_id: str, input_path: str, filename: str, mode: str, lang: str) -> None:
     """Exécute le pipeline en tâche de fond et écrit le résultat (ou l'erreur)
     dans le store de jobs.
@@ -371,8 +329,8 @@ def transcribe_status(job_id: str, lang: str = LANGUAGE):
     """Renvoie l'état d'un job créé par POST /api/transcribe/start :
     - en cours : {"status": "processing", "step": ..., "chunk_current": ..., "chunk_total": ...,
                   "summary_current": ..., "summary_total": ...}
-    - terminé  : {"status": "done", ...corps identique à la réponse synchrone de /process}
-    - échoué   : même code/message que /process aurait renvoyé, plus
+    - terminé  : {"status": "done", mode, stats, markdown | transcript}
+    - échoué   : code et message de l'échec, plus
                  `partial_transcript` si une partie a déjà été transcrite
 
     Le job est supprimé du store dès qu'un statut terminal (done/error) a été

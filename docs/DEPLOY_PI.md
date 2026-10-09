@@ -59,7 +59,7 @@ cloudflared tunnel route dns <nom-du-tunnel> parseandcut.alithiel31.dev
 sudo systemctl restart cloudflared
 ```
 
-Vérifier que `https://parseandcut.alithiel31.dev` répond et que `/api/transcribe`
+Vérifier que `https://parseandcut.alithiel31.dev` répond et que `/api/transcribe/start`
 passe bien à travers le proxy nginx → backend.
 
 ## 4. Variables d'environnement
