@@ -16,6 +16,7 @@ import httpx
 import pytest
 from groq import APITimeoutError, AuthenticationError, InternalServerError, RateLimitError
 
+import app.services.groq_retry as groq_retry
 import app.services.transcription as transcription
 
 
@@ -81,7 +82,7 @@ class TestRetries:
     def pauses(self, monkeypatch):
         """Remplace time.sleep : aucune vraie attente, et on garde les délais demandés."""
         durees = []
-        monkeypatch.setattr(transcription.time, "sleep", durees.append)
+        monkeypatch.setattr(groq_retry.time, "sleep", durees.append)
         return durees
 
     def _client(self, monkeypatch, *effets):
@@ -124,7 +125,7 @@ class TestRetries:
 
         transcription.transcrire_chunk(fake_chunk)
 
-        assert pauses == [transcription.ATTENTE_MAX_SEC]
+        assert pauses == [groq_retry.ATTENTE_MAX_SEC]
 
     def test_erreur_5xx_est_retentee(self, monkeypatch, fake_chunk, pauses):
         self._client(
@@ -161,15 +162,15 @@ class TestRetries:
     def test_abandon_apres_toutes_les_tentatives(self, monkeypatch, fake_chunk, pauses):
         fake_client = self._client(
             monkeypatch,
-            *[_status_error(RateLimitError, 429) for _ in range(transcription.MAX_TENTATIVES)],
+            *[_status_error(RateLimitError, 429) for _ in range(groq_retry.MAX_TENTATIVES)],
         )
 
         with pytest.raises(RuntimeError, match="RateLimitError"):
             transcription.transcrire_chunk(fake_chunk)
 
-        assert fake_client.audio.transcriptions.create.call_count == transcription.MAX_TENTATIVES
+        assert fake_client.audio.transcriptions.create.call_count == groq_retry.MAX_TENTATIVES
         # Pas d'attente inutile après la dernière tentative.
-        assert len(pauses) == transcription.MAX_TENTATIVES - 1
+        assert len(pauses) == groq_retry.MAX_TENTATIVES - 1
 
 
 def _seg(texte, no_speech_prob=0.01, avg_logprob=-0.2, start=0.0):

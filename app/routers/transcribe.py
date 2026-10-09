@@ -19,7 +19,7 @@ from app.i18n import SUPPORTED_LANGS, t
 from app.limiter import limiter
 from app.services.audio import allowed_file, découper_audio, est_silencieux, obtenir_duree_audio, ALLOWED_EXTENSIONS
 from app.services.jobs import create_job, delete_job, get_job, update_job
-from app.services.prompt import construire_prompt
+from app.services.summary import generer_fiche
 from app.services.transcription import transcrire_chunk
 
 router = APIRouter()
@@ -223,14 +223,7 @@ def _executer_pipeline(
             logger.info(f"🧠 {log_prefix}Structuration par IA...")
             if on_progress:
                 on_progress(step="llm")
-            completion = client.chat.completions.create(
-                model="openai/gpt-oss-120b",
-                messages=[{"role": "user", "content": construire_prompt(texte_complet, lang)}],
-                temperature=0.4,
-                max_tokens=4096
-            )
-
-            response_body["markdown"] = completion.choices[0].message.content
+            response_body["markdown"] = generer_fiche(client, texte_complet, lang, on_progress)
             logger.info(f"✅ {log_prefix}Fiche générée avec succès")
         else:
             logger.info(f"⏭️  {log_prefix}Mode transcription basique — pas d'appel LLM")
@@ -376,7 +369,8 @@ def transcribe_start(
 @router.get('/api/transcribe/status/{job_id}')
 def transcribe_status(job_id: str, lang: str = LANGUAGE):
     """Renvoie l'état d'un job créé par POST /api/transcribe/start :
-    - en cours : {"status": "processing", "step": ..., "chunk_current": ..., "chunk_total": ...}
+    - en cours : {"status": "processing", "step": ..., "chunk_current": ..., "chunk_total": ...,
+                  "summary_current": ..., "summary_total": ...}
     - terminé  : {"status": "done", ...corps identique à la réponse synchrone de /process}
     - échoué   : même code/message que /process aurait renvoyé, plus
                  `partial_transcript` si une partie a déjà été transcrite
@@ -414,4 +408,6 @@ def transcribe_status(job_id: str, lang: str = LANGUAGE):
         "step": job.get("step"),
         "chunk_current": job.get("chunk_current"),
         "chunk_total": job.get("chunk_total"),
+        "summary_current": job.get("summary_current"),
+        "summary_total": job.get("summary_total"),
     })

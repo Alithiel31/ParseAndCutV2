@@ -325,3 +325,40 @@ class TestChunksSilencieux:
         corps = resp.json()
         assert corps["stats"]["silent_chunks"] == 2
         assert corps["transcript"] == "[00:01] Du texte."
+
+
+class TestResumeParBlocsDansLeJob:
+    def test_longue_transcription_resumee_en_deux_etapes(self, client_app, monkeypatch, tmp_path):
+        import app.services.summary as summary
+
+        monkeypatch.setattr(summary, "SEUIL_PASSE_UNIQUE_CHARS", 500)
+        monkeypatch.setattr(summary, "TAILLE_BLOC_CHARS", 300)
+
+        chunk = tmp_path / "chunk_0.mp3"
+        chunk.write_bytes(b"faux audio")
+        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: [str(chunk)])
+        long_texte = " ".join(f"Phrase {i} " + "y" * 40 + "." for i in range(30))
+        monkeypatch.setattr(
+            transcribe, "transcrire_chunk",
+            lambda path, retries=5: (long_texte, [{"start": 0.0, "end": 1.0, "text": long_texte}]),
+        )
+
+        prompts = []
+
+        def _create(**kwargs):
+            prompts.append(kwargs["messages"][0]["content"])
+            fake = MagicMock()
+            fake.choices[0].message.content = "## Résumé\nFiche finale" if "PARTIE 1" in prompts[-1] else "notes"
+            return fake
+
+        fake_groq = MagicMock()
+        fake_groq.chat.completions.create.side_effect = _create
+        monkeypatch.setattr(transcribe, "client", fake_groq)
+
+        files = {"audio": ("reunion.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe/start", files=files)
+        résultat = _attendre_fin_job(client_app, resp.json()["job_id"])
+
+        assert résultat.status_code == 200
+        assert résultat.json()["markdown"] == "## Résumé\nFiche finale"
+        assert len(prompts) > 2  # plusieurs blocs + une fusion
