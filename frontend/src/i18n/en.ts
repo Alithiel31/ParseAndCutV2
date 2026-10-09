@@ -13,6 +13,7 @@ const en = {
 
   "home.errors.noFile": "Select an audio file first.",
   "home.errors.unknown": "Unknown error",
+  "home.errors.partialRecovered": "The part already transcribed is shown below.",
   "home.status.uploading": "Sending file to the server…",
   "home.status.resuming": "Resuming progress tracking…",
   "home.status.cutting": "Splitting audio…",

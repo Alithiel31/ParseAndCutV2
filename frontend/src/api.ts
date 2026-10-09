@@ -41,7 +41,15 @@ const API_URL = import.meta.env.VITE_API_URL || "";
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_MS = 30 * 60 * 1000; // garde-fou : 30 min sans résultat = abandon
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  // Texte déjà transcrit avant l'échec du job (quota, réseau, panne du résumé IA…).
+  partialTranscript?: string;
+
+  constructor(message: string, partialTranscript?: string) {
+    super(message);
+    this.partialTranscript = partialTranscript;
+  }
+}
 
 async function lireErreur(response: Response, lang: Lang): Promise<never> {
   // Repli local (pas un composant, donc pas de useTranslation()) utilisé
@@ -50,7 +58,10 @@ async function lireErreur(response: Response, lang: Lang): Promise<never> {
   const err = await response
     .json()
     .catch(() => ({ detail: translate(lang, "api.httpError", { status: response.status }) }));
-  throw new ApiError(err.detail || translate(lang, "api.genericError", { status: response.status }));
+  throw new ApiError(
+    err.detail || translate(lang, "api.genericError", { status: response.status }),
+    typeof err.partial_transcript === "string" && err.partial_transcript ? err.partial_transcript : undefined
+  );
 }
 
 export async function transcribeAudio(

@@ -11,6 +11,7 @@ const fr = {
 
   "home.errors.noFile": "Sélectionnez d'abord un fichier audio.",
   "home.errors.unknown": "Erreur inconnue",
+  "home.errors.partialRecovered": "La partie déjà transcrite est affichée ci-dessous.",
   "home.status.uploading": "Envoi du fichier au serveur…",
   "home.status.resuming": "Reprise du suivi de votre traitement…",
   "home.status.cutting": "Découpage en cours…",
