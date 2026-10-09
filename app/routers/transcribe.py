@@ -56,6 +56,15 @@ def _formater_horodatage(secondes: float) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
 
 
+def _formater_transcript(segments: list[dict]) -> str:
+    """Transcription horodatée « [mm:ss] texte », une ligne par segment non vide."""
+    return "\n".join(
+        f"[{_formater_horodatage(seg['start'])}] {seg['text']}"
+        for seg in segments
+        if seg["text"]
+    )
+
+
 def _valider_requete(lang: str, audio: Optional[UploadFile], mode: str) -> None:
     """Valide lang/client/audio/mode communs aux deux points d'entrée
     (synchrone et asynchrone). Lève HTTPException sinon."""
@@ -131,7 +140,10 @@ def _executer_pipeline(
     réponse ; lève `_ErreurPipeline` (ou l'exception d'origine) en cas
     d'échec, à charge pour l'appelant de la traduire via `_traduire_erreur`.
     `on_progress(**champs)`, si fourni, reçoit l'étape courante (step,
-    chunk_total, chunk_current). Supprime ses propres chunks, pas `input_path`.
+    chunk_total, chunk_current) et, après chaque chunk transcrit, la
+    transcription cumulée (partial_transcript) : si une étape ultérieure
+    échoue, ce qui a déjà été transcrit n'est pas perdu.
+    Supprime ses propres chunks, pas `input_path`.
     """
     chunks_créés: list[str] = []
     try:
@@ -178,6 +190,9 @@ def _executer_pipeline(
 
             os.remove(path)  # Nettoyage immédiat après transcription
 
+            if on_progress:
+                on_progress(partial_transcript=_formater_transcript(segments_horodatés))
+
         if not texte_complet.strip():
             raise _ErreurPipeline(422, t("transcription_empty", lang))
 
@@ -207,11 +222,7 @@ def _executer_pipeline(
             logger.info(f"✅ {log_prefix}Fiche générée avec succès")
         else:
             logger.info(f"⏭️  {log_prefix}Mode transcription basique — pas d'appel LLM")
-            response_body["transcript"] = "\n".join(
-                f"[{_formater_horodatage(seg['start'])}] {seg['text']}"
-                for seg in segments_horodatés
-                if seg["text"]
-            )
+            response_body["transcript"] = _formater_transcript(segments_horodatés)
 
         # --- Stats de performance (mesure uniquement, aucun impact fonctionnel) ---
         temps_traitement_sec = time.perf_counter() - début_traitement
@@ -355,7 +366,8 @@ def transcribe_status(job_id: str, lang: str = LANGUAGE):
     """Renvoie l'état d'un job créé par POST /api/transcribe/start :
     - en cours : {"status": "processing", "step": ..., "chunk_current": ..., "chunk_total": ...}
     - terminé  : {"status": "done", ...corps identique à la réponse synchrone de /process}
-    - échoué   : HTTPException avec le même code/message que /process aurait renvoyé
+    - échoué   : même code/message que /process aurait renvoyé, plus
+                 `partial_transcript` si une partie a déjà été transcrite
 
     Le job est supprimé du store dès qu'un statut terminal (done/error) a été
     lu une première fois : chaque job n'est consommé qu'une seule fois par un
@@ -370,6 +382,15 @@ def transcribe_status(job_id: str, lang: str = LANGUAGE):
 
     if job["status"] == "error":
         delete_job(job_id)
+        # Même forme que HTTPException ({"detail": ...}) ; `partial_transcript`
+        # n'est ajouté que si une partie de l'audio a pu être transcrite avant
+        # l'échec (réseau, quota Groq, panne du résumé IA…).
+        partial = job.get("partial_transcript")
+        if partial:
+            return JSONResponse(
+                {"detail": job["detail"], "partial_transcript": partial},
+                status_code=job["http_status"],
+            )
         raise HTTPException(status_code=job["http_status"], detail=job["detail"])
 
     if job["status"] == "done":

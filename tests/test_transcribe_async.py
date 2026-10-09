@@ -204,3 +204,74 @@ class TestTranscribeStatusRoute:
 
         resp = _attendre_fin_job(client_app, job_id)
         assert resp.status_code == 502
+
+
+class TestTranscriptionPartielle:
+    """Si le job échoue en cours de route, ce qui est déjà transcrit doit
+    être renvoyé avec l'erreur plutôt que perdu."""
+
+    def _chunks(self, tmp_path, n):
+        chunks = []
+        for i in range(n):
+            chunk = tmp_path / f"chunk_{i}.mp3"
+            chunk.write_bytes(b"faux audio")
+            chunks.append(str(chunk))
+        return chunks
+
+    def _lancer(self, client_app, mode="transcript"):
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe/start", files=files, data={"mode": mode})
+        return _attendre_fin_job(client_app, resp.json()["job_id"])
+
+    def test_echec_au_second_chunk_renvoie_le_premier(self, client_app, monkeypatch, tmp_path):
+        chunks = self._chunks(tmp_path, 2)
+        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        appels = []
+
+        def _transcrire(path, retries=5):
+            appels.append(path)
+            if len(appels) == 2:
+                raise RuntimeError("quota Groq épuisé")
+            return "Premier. ", [{"start": 0.0, "end": 2.0, "text": "Premier."}]
+
+        monkeypatch.setattr(transcribe, "transcrire_chunk", _transcrire)
+
+        resp = self._lancer(client_app)
+
+        assert resp.status_code == 502
+        corps = resp.json()
+        assert "quota Groq épuisé" in corps["detail"]
+        assert corps["partial_transcript"] == "[00:00] Premier."
+
+    def test_echec_du_resume_conserve_la_transcription_complete(self, client_app, monkeypatch, tmp_path):
+        chunks = self._chunks(tmp_path, 1)
+        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(
+            transcribe, "transcrire_chunk",
+            lambda path, retries=5: ("Cours. ", [{"start": 3.0, "end": 5.0, "text": "Cours."}]),
+        )
+        fake_groq = MagicMock()
+        fake_groq.chat.completions.create.side_effect = ValueError("LLM indisponible")
+        monkeypatch.setattr(transcribe, "client", fake_groq)
+
+        resp = self._lancer(client_app, mode="summary")
+
+        assert resp.status_code == 500
+        assert resp.json()["partial_transcript"] == "[00:03] Cours."
+
+    def test_echec_sans_rien_de_transcrit_garde_la_forme_habituelle(self, client_app, monkeypatch, tmp_path):
+        chunks = self._chunks(tmp_path, 1)
+        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        def _raise(*a, **k):
+            raise RuntimeError("échec immédiat")
+
+        monkeypatch.setattr(transcribe, "transcrire_chunk", _raise)
+
+        resp = self._lancer(client_app)
+
+        assert resp.status_code == 502
+        assert set(resp.json()) == {"detail"}
