@@ -17,10 +17,15 @@ from fastapi.responses import JSONResponse
 from groq import APIError
 from werkzeug.utils import secure_filename
 
-from app.config import CHUNK_DURATION, LANGUAGE, MAX_UPLOAD_SIZE_MB, RATE_LIMIT_PROCESS, client, logger
+from app.config import (
+    CHUNK_DURATION, LANGUAGE, MAX_UPLOAD_SIZE_MB, RATE_LIMIT_PROCESS, RECORDING_SEGMENT_SEC, client, logger,
+)
 from app.i18n import SUPPORTED_LANGS, t
 from app.limiter import limiter
-from app.services.audio import allowed_file, découper_audio, est_silencieux, obtenir_duree_audio, ALLOWED_EXTENSIONS
+from app.services.audio import (
+    allowed_file, convertir_en_mp3, découper_audio, est_silencieux, obtenir_duree_audio, ALLOWED_EXTENSIONS,
+)
+from app.services import recordings
 from app.services.jobs import create_job, delete_job, get_job, update_job
 from app.services.summary import generer_fiche
 from app.services.transcription import transcrire_chunk
@@ -129,6 +134,102 @@ def _supprimer_fichier_entree(input_path: str) -> None:
         logger.info(f"Fichier original supprimé : {input_path}")
 
 
+def _transcrire_et_structurer(
+    chunks: list[str],
+    offsets: list[float],
+    durée_audio_sec: Optional[float],
+    début_traitement: float,
+    mode: str,
+    lang: str,
+    on_progress: Optional[Callable[..., None]],
+    log_prefix: str,
+) -> dict:
+    """Étapes communes à tous les points d'entrée une fois l'audio découpé en
+    chunks : transcription chunk par chunk, puis résumé. `offsets[i]` est le
+    début (en secondes) du chunk i dans l'enregistrement complet. Supprime
+    chaque chunk dès qu'il est transcrit ; les restes sont à nettoyer par
+    l'appelant en cas d'exception."""
+    # --- 2. Transcription chunk par chunk ---
+    logger.info(f"🎙️  {log_prefix}Transcription Whisper...")
+    if on_progress:
+        on_progress(step="whisper", chunk_total=len(chunks))
+    texte_complet = ""
+    segments_horodatés = []
+    chunks_silencieux = 0
+
+    for i, path in enumerate(chunks):
+        if on_progress:
+            on_progress(chunk_current=i + 1)
+        logger.info(f"  {log_prefix}[{i+1}/{len(chunks)}] {os.path.basename(path)}")
+
+        # Un chunk de silence numérique (micro coupé) ferait halluciner
+        # Whisper et consommerait du quota Groq pour rien.
+        if est_silencieux(path):
+            logger.warning(f"  {log_prefix}chunk {i+1} silencieux — ignoré")
+            chunks_silencieux += 1
+            os.remove(path)
+            continue
+
+        texte_chunk, segments = transcrire_chunk(path)
+        texte_complet += texte_chunk + " "
+
+        offset = offsets[i]
+        for seg in segments:
+            segments_horodatés.append({
+                "start": seg["start"] + offset,
+                "text": seg["text"],
+            })
+
+        os.remove(path)  # Nettoyage immédiat après transcription
+
+        if on_progress:
+            on_progress(partial_transcript=_formater_transcript(segments_horodatés))
+
+    if not texte_complet.strip():
+        raison = "audio_silent" if chunks_silencieux == len(chunks) else "transcription_empty"
+        raise _ErreurPipeline(422, t(raison, lang))
+
+    logger.info(f"✅ {log_prefix}Transcription complète : {len(texte_complet):,} caractères")
+
+    response_body = {
+        "mode": mode,
+        "stats": {
+            "chunks":               len(chunks),
+            "transcription_chars":  len(texte_complet),
+            "silent_chunks":        chunks_silencieux
+        }
+    }
+
+    # --- 3. Structuration LLM (uniquement en mode résumé) ---
+    if mode == "summary":
+        logger.info(f"🧠 {log_prefix}Structuration par IA...")
+        if on_progress:
+            on_progress(step="llm")
+        response_body["markdown"] = generer_fiche(client, texte_complet, lang, on_progress)
+        logger.info(f"✅ {log_prefix}Fiche générée avec succès")
+    else:
+        logger.info(f"⏭️  {log_prefix}Mode transcription basique — pas d'appel LLM")
+        response_body["transcript"] = _formater_transcript(segments_horodatés)
+
+    # --- Stats de performance (mesure uniquement, aucun impact fonctionnel) ---
+    temps_traitement_sec = time.perf_counter() - début_traitement
+    response_body["stats"]["audio_duration_sec"] = (
+        round(durée_audio_sec, 2) if durée_audio_sec is not None else None
+    )
+    response_body["stats"]["processing_time_sec"] = round(temps_traitement_sec, 2)
+
+    if durée_audio_sec:
+        ratio = durée_audio_sec / temps_traitement_sec
+        logger.info(
+            f"⏱️  {log_prefix}{_formater_horodatage(durée_audio_sec)} audio traité en "
+            f"{temps_traitement_sec:.1f}s (ratio {ratio:.0f}x)"
+        )
+    else:
+        logger.info(f"⏱️  {log_prefix}Traitement terminé en {temps_traitement_sec:.1f}s (durée audio inconnue)")
+
+    return response_body
+
+
 def _executer_pipeline(
     input_path: str,
     pipeline_id: str,
@@ -169,85 +270,11 @@ def _executer_pipeline(
 
         logger.info(f"✅ {log_prefix}{len(chunks_créés)} chunk(s) prêts à transcrire")
 
-        # --- 2. Transcription chunk par chunk ---
-        logger.info(f"🎙️  {log_prefix}Transcription Whisper...")
-        if on_progress:
-            on_progress(step="whisper", chunk_total=len(chunks_créés))
-        texte_complet = ""
-        segments_horodatés = []
-        chunks_silencieux = 0
-
-        for i, path in enumerate(chunks_créés):
-            if on_progress:
-                on_progress(chunk_current=i + 1)
-            logger.info(f"  {log_prefix}[{i+1}/{len(chunks_créés)}] {os.path.basename(path)}")
-
-            # Un chunk de silence numérique (micro coupé) ferait halluciner
-            # Whisper et consommerait du quota Groq pour rien.
-            if est_silencieux(path):
-                logger.warning(f"  {log_prefix}chunk {i+1} silencieux — ignoré")
-                chunks_silencieux += 1
-                os.remove(path)
-                continue
-
-            texte_chunk, segments = transcrire_chunk(path)
-            texte_complet += texte_chunk + " "
-
-            offset = i * CHUNK_DURATION
-            for seg in segments:
-                segments_horodatés.append({
-                    "start": seg["start"] + offset,
-                    "text": seg["text"],
-                })
-
-            os.remove(path)  # Nettoyage immédiat après transcription
-
-            if on_progress:
-                on_progress(partial_transcript=_formater_transcript(segments_horodatés))
-
-        if not texte_complet.strip():
-            raison = "audio_silent" if chunks_silencieux == len(chunks_créés) else "transcription_empty"
-            raise _ErreurPipeline(422, t(raison, lang))
-
-        logger.info(f"✅ {log_prefix}Transcription complète : {len(texte_complet):,} caractères")
-
-        response_body = {
-            "mode": mode,
-            "stats": {
-                "chunks":               len(chunks_créés),
-                "transcription_chars":  len(texte_complet),
-                "silent_chunks":        chunks_silencieux
-            }
-        }
-
-        # --- 3. Structuration LLM (uniquement en mode résumé) ---
-        if mode == "summary":
-            logger.info(f"🧠 {log_prefix}Structuration par IA...")
-            if on_progress:
-                on_progress(step="llm")
-            response_body["markdown"] = generer_fiche(client, texte_complet, lang, on_progress)
-            logger.info(f"✅ {log_prefix}Fiche générée avec succès")
-        else:
-            logger.info(f"⏭️  {log_prefix}Mode transcription basique — pas d'appel LLM")
-            response_body["transcript"] = _formater_transcript(segments_horodatés)
-
-        # --- Stats de performance (mesure uniquement, aucun impact fonctionnel) ---
-        temps_traitement_sec = time.perf_counter() - début_traitement
-        response_body["stats"]["audio_duration_sec"] = (
-            round(durée_audio_sec, 2) if durée_audio_sec is not None else None
+        return _transcrire_et_structurer(
+            chunks_créés,
+            [i * CHUNK_DURATION for i in range(len(chunks_créés))],
+            durée_audio_sec, début_traitement, mode, lang, on_progress, log_prefix,
         )
-        response_body["stats"]["processing_time_sec"] = round(temps_traitement_sec, 2)
-
-        if durée_audio_sec:
-            ratio = durée_audio_sec / temps_traitement_sec
-            logger.info(
-                f"⏱️  {log_prefix}{_formater_horodatage(durée_audio_sec)} audio traité en "
-                f"{temps_traitement_sec:.1f}s (ratio {ratio:.0f}x)"
-            )
-        else:
-            logger.info(f"⏱️  {log_prefix}Traitement terminé en {temps_traitement_sec:.1f}s (durée audio inconnue)")
-
-        return response_body
 
     finally:
         # Nettoyage garanti des chunks restants, même en cas d'exception
@@ -280,6 +307,72 @@ def _traiter_job(job_id: str, input_path: str, filename: str, mode: str, lang: s
 
     finally:
         _supprimer_fichier_entree(input_path)
+
+
+def _executer_pipeline_segments(
+    segments: list[str],
+    pipeline_id: str,
+    mode: str,
+    lang: str,
+    on_progress: Optional[Callable[..., None]] = None,
+    log_prefix: str = "",
+) -> dict:
+    """Pipeline pour un enregistrement envoyé par segments : chaque segment
+    (déjà court et autonome) devient un chunk MP3, sans nouveau découpage.
+    Les décalages d'horodatage viennent de la durée réelle de chaque segment.
+    Un segment illisible est ignoré (sa durée nominale est comptée pour garder
+    les horodatages suivants à peu près justes) ; si aucun n'est lisible, échec.
+    Supprime ses propres chunks, pas les segments d'origine."""
+    chunks_créés: list[str] = []
+    try:
+        début_traitement = time.perf_counter()
+        if on_progress:
+            on_progress(step="cutting")
+
+        offsets: list[float] = []
+        position = 0.0
+        for i, source in enumerate(segments):
+            chunk = os.path.join(tempfile.gettempdir(), f"chunk_{pipeline_id}_{i}.mp3")
+            if not convertir_en_mp3(source, chunk):
+                logger.warning(f"  {log_prefix}segment {i} illisible — ignoré")
+                position += RECORDING_SEGMENT_SEC
+                continue
+            chunks_créés.append(chunk)
+            offsets.append(position)
+            position += obtenir_duree_audio(chunk) or RECORDING_SEGMENT_SEC
+
+        if not chunks_créés:
+            raise _ErreurPipeline(422, t("ffmpeg_unreadable", lang))
+
+        logger.info(f"✅ {log_prefix}{len(chunks_créés)}/{len(segments)} segment(s) prêts à transcrire")
+        return _transcrire_et_structurer(
+            chunks_créés, offsets, position, début_traitement, mode, lang, on_progress, log_prefix,
+        )
+
+    finally:
+        for path in chunks_créés:
+            if os.path.exists(path):
+                os.remove(path)
+
+
+def _traiter_enregistrement(job_id: str, rec_id: str, mode: str, lang: str) -> None:
+    """Tâche de fond d'un enregistrement par segments : même contrat que
+    `_traiter_job` (résultat ou erreur écrits dans le job), puis suppression de
+    l'audio du serveur."""
+    try:
+        résultat = _executer_pipeline_segments(
+            recordings.chemins_ordonnes(rec_id), job_id, mode, lang,
+            on_progress=lambda **champs: update_job(job_id, **champs),
+            log_prefix=f"[job {job_id}] ",
+        )
+        update_job(job_id, status="done", result=résultat)
+
+    except Exception as exc:
+        status, detail = _traduire_erreur(exc, lang)
+        update_job(job_id, status="error", http_status=status, detail=detail)
+
+    finally:
+        recordings.supprimer(rec_id)
 
 
 @router.post('/api/transcribe/start')

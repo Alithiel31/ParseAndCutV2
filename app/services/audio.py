@@ -70,6 +70,25 @@ def est_silencieux(path: str) -> bool:
     return pic is not None and pic < SEUIL_SILENCE_DB
 
 
+def convertir_en_mp3(input_path: str, output_path: str) -> bool:
+    """Convertit un fichier audio (ex. un segment webm/mp4 du navigateur) en MP3,
+    même format que les chunks de `découper_audio`. Retourne False si FFmpeg
+    échoue ou ne produit rien d'exploitable (segment vide/corrompu)."""
+    try:
+        result = subprocess.run(
+            [FFMPEG_PATH, "-i", input_path, "-vn", "-acodec", "libmp3lame", "-ab", "128k",
+             "-loglevel", "error", output_path, "-y"],
+            capture_output=True, timeout=120
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+    ok = result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 0
+    if not ok and os.path.exists(output_path):
+        os.remove(output_path)
+    return ok
+
+
 def découper_audio(
     input_path: str,
     request_id: str,

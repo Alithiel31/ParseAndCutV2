@@ -29,6 +29,14 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 - The audio recorder keeps the screen on (Screen Wake Lock) and warns immediately if the browser
   mutes the microphone, which silently produced empty recordings on Android when the screen turned off
 
+- Segmented recording API (`/api/recordings`): the browser can send a long recording in
+  self-contained segments (~5 min) while it is still running, instead of one file at the end,
+  so a crashed tab or a lost connection no longer loses the whole recording. The segments are
+  assembled and processed by the same pipeline and job tracking as a regular upload; a missing
+  segment is reported (HTTP 409 + `missing`) so the client can resend it. Upload requests are
+  idempotent per segment. The audio is stored on the server only until processing ends (or 6 h
+  if abandoned). Backend part only for now; the frontend is not using it yet
+
 ### Removed
 
 - **Breaking:** the synchronous `POST /process` and `POST /api/transcribe` endpoints. They could

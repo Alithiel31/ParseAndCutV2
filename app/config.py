@@ -50,6 +50,17 @@ MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", 100))
 # Protège les crédits Groq et les ressources du Raspberry Pi contre les abus anonymes.
 RATE_LIMIT_PROCESS = os.getenv("RATE_LIMIT_PROCESS", "5/minute")
 
+# --- Enregistrement par segments (voir app/routers/recordings.py) ---
+# Le navigateur découpe l'enregistrement en segments autonomes et les envoie au
+# fil de l'eau : un plantage de l'onglet ne fait perdre que le segment en cours.
+RECORDING_SEGMENT_SEC     = int(os.getenv("RECORDING_SEGMENT_SEC", 300))     # 5 min par segment
+MAX_SEGMENT_SIZE_MB       = int(os.getenv("MAX_SEGMENT_SIZE_MB", 50))        # par segment
+MAX_RECORDING_SIZE_MB     = int(os.getenv("MAX_RECORDING_SIZE_MB", 300))     # cumul d'un enregistrement
+MAX_SEGMENTS              = int(os.getenv("MAX_SEGMENTS", 500))              # ≈ 41 h à 5 min
+# Un enregistrement envoie un segment toutes les ~5 min : bien plus large que
+# RATE_LIMIT_PROCESS (qui protège le démarrage d'un traitement), mais borné.
+RATE_LIMIT_SEGMENTS       = os.getenv("RATE_LIMIT_SEGMENTS", "60/minute")
+
 # --- INITIALISATION GROQ ---
 api_key = os.environ.get("GROQ_API_KEY")
 client  = None

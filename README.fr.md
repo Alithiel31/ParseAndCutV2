@@ -104,7 +104,12 @@ Nginx (conteneur frontend) sert les fichiers statiques du PWA et reverse-proxy `
 | `FFMPEG_PATH` | ❌ | `ffmpeg` | Chemin vers le binaire FFmpeg |
 | `CORS_ORIGINS` | ❌ | `https://parseandcut.alithiel31.dev` | Origines autorisées séparées par des virgules — à surcharger en dev local (Vite sur `:5173` qui tape sur Uvicorn sur `:5000`) |
 | `MAX_UPLOAD_SIZE_MB` | ❌ | `100` | Taille max d'upload vérifiée côté backend (en plus du `client_max_body_size` de nginx) — aligné sur le plafond du proxy Cloudflare sur les plans Free/Pro |
-| `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Limite de requêtes sur `/api/transcribe/start` (par IP), format `N/period` |
+| `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Limite de requêtes sur `/api/transcribe/start` et sur la création/fin d'un enregistrement par segments (par IP), format `N/period` |
+| `RATE_LIMIT_SEGMENTS` | ❌ | `60/minute` | Limite d'envois de segments d'un enregistrement par segments (par IP, partagée entre tous les segments) |
+| `RECORDING_SEGMENT_SEC` | ❌ | `300` | Durée d'un segment d'enregistrement, annoncée au navigateur |
+| `MAX_SEGMENT_SIZE_MB` | ❌ | `50` | Taille max d'un segment envoyé |
+| `MAX_RECORDING_SIZE_MB` | ❌ | `300` | Taille cumulée max des segments d'un enregistrement |
+| `MAX_SEGMENTS` | ❌ | `500` | Nombre max de segments d'un enregistrement |
 | `FLASK_DEBUG` | ❌ | `false` | Mode debug (dev uniquement) |
 
 > **Note production :** sur le déploiement Caesura, `GROQ_API_KEY` n'est pas lue depuis `.env` — elle est injectée au déploiement via Infisical (voir `docs/DEPLOY_PI.md`). Pour le développement local, renseigne-la directement dans ton `.env` comme décrit ci-dessous.
