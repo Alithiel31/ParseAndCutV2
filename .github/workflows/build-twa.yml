@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Historique complet requis : versionCode = git rev-list --count HEAD
           # (avec le shallow clone par défaut, le compte vaut toujours 1)
