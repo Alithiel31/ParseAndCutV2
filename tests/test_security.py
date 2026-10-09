@@ -1,6 +1,6 @@
 """
 Tests des durcissements sécurité : CORS par défaut, rate limiting sur
-/process, et limite de taille d'upload côté backend.
+/api/transcribe/start, et limite de taille d'upload côté backend.
 
 Lancer avec :  pytest
 """
@@ -31,15 +31,15 @@ class TestCorsDefault:
 
 
 class TestRateLimit:
-    def test_depassement_rate_limit_sur_process(self, client_app):
+    def test_depassement_rate_limit_sur_start(self, client_app):
         # RATE_LIMIT_PROCESS par défaut : 5/minute. Le statut exact des 5
         # premiers appels n'importe pas (client Groq non configuré en test) :
         # seul compte le fait que la 6e requête soit bloquée par le rate limit.
         for _ in range(5):
-            resp = client_app.post("/process")
+            resp = client_app.post("/api/transcribe/start")
             assert resp.status_code != 429
 
-        resp = client_app.post("/process")
+        resp = client_app.post("/api/transcribe/start")
         assert resp.status_code == 429
 
 
@@ -51,13 +51,13 @@ class TestRateLimitPerRealClientIp:
         # le quota 5/minute serait partagé par tous les visiteurs. On vérifie ici
         # que deux IP transmises via X-Forwarded-For ont bien des quotas distincts.
         for _ in range(5):
-            resp = client_app.post("/process", headers={"X-Forwarded-For": "1.1.1.1"})
+            resp = client_app.post("/api/transcribe/start", headers={"X-Forwarded-For": "1.1.1.1"})
             assert resp.status_code != 429
 
-        resp = client_app.post("/process", headers={"X-Forwarded-For": "1.1.1.1"})
+        resp = client_app.post("/api/transcribe/start", headers={"X-Forwarded-For": "1.1.1.1"})
         assert resp.status_code == 429
 
-        resp_autre_ip = client_app.post("/process", headers={"X-Forwarded-For": "2.2.2.2"})
+        resp_autre_ip = client_app.post("/api/transcribe/start", headers={"X-Forwarded-For": "2.2.2.2"})
         assert resp_autre_ip.status_code != 429
 
 
@@ -68,6 +68,6 @@ class TestUploadSizeLimit:
 
         contenu = b"x" * 500  # dépasse largement la limite de test (100 octets)
         files = {"audio": ("cours.mp3", contenu, "audio/mpeg")}
-        resp = client_app.post("/process", files=files)
+        resp = client_app.post("/api/transcribe/start", files=files)
 
         assert resp.status_code == 413

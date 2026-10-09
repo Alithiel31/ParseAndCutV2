@@ -66,17 +66,17 @@ jobs:
         STATUS=$(echo $RESPONSE | jq -r '.status')
         [ "$STATUS" = "ok" ] || exit 1
 
-    - name: Test route /process sans fichier (doit renvoyer 400)
+    - name: Test route /api/transcribe/start sans fichier (doit renvoyer 400)
       run: |
         STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-          -X POST http://127.0.0.1:5000/process)
+          -X POST http://127.0.0.1:5000/api/transcribe/start)
         echo "Status reçu : $STATUS"
         [ "$STATUS" = "400" ] || exit 1
 
-    - name: Test route /process format invalide (doit renvoyer 415)
+    - name: Test route /api/transcribe/start format invalide (doit renvoyer 415)
       run: |
         STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-          -X POST http://127.0.0.1:5000/process \
+          -X POST http://127.0.0.1:5000/api/transcribe/start \
           -F "audio=@requirements.txt")
         echo "Status reçu : $STATUS"
         [ "$STATUS" = "415" ] || exit 1

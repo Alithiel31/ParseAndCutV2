@@ -46,7 +46,7 @@ CHUNK_DURATION   = int(os.getenv("CHUNK_DURATION_SEC", 600))  # 10 min par chunk
 # contrôle de l'appli (passer à un plan Business/Enterprise lève ce plafond).
 MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", 100))
 
-# Limite de requêtes sur /process (slowapi), au format "N/period" (ex: "5/minute").
+# Limite de requêtes sur /api/transcribe/start (slowapi), au format "N/period" (ex: "5/minute").
 # Protège les crédits Groq et les ressources du Raspberry Pi contre les abus anonymes.
 RATE_LIMIT_PROCESS = os.getenv("RATE_LIMIT_PROCESS", "5/minute")
 

@@ -2,11 +2,10 @@
 Tests du flux asynchrone (app.routers.transcribe : /api/transcribe/start +
 /api/transcribe/status/{job_id}).
 
-Ce flux existe pour contourner le timeout fixe de 100s imposé par Cloudflare
-sur les requêtes proxyées (voir docs/Troubleshooting.fr.md) : /process reste
-synchrone (et testé séparément dans test_transcribe.py) pour ne pas casser
-les clients existants (PWA), mais le pipeline y est trop long pour un fichier
-de plus de quelques minutes d'audio derrière le tunnel Cloudflare.
+Ce flux (le seul point d'entrée de transcription) existe pour contourner le
+timeout fixe de 100s imposé par Cloudflare sur les requêtes proxyées (voir
+docs/Troubleshooting.fr.md) : le pipeline est trop long pour tenir dans une
+seule requête dès quelques minutes d'audio.
 
 Le traitement réel tourne dans un thread en tâche de fond : les tests
 attendent la fin du job en sondant /status en boucle (le pipeline est mocké,
@@ -204,3 +203,161 @@ class TestTranscribeStatusRoute:
 
         resp = _attendre_fin_job(client_app, job_id)
         assert resp.status_code == 502
+
+
+class TestTranscriptionPartielle:
+    """Si le job échoue en cours de route, ce qui est déjà transcrit doit
+    être renvoyé avec l'erreur plutôt que perdu."""
+
+    def _chunks(self, tmp_path, n):
+        chunks = []
+        for i in range(n):
+            chunk = tmp_path / f"chunk_{i}.mp3"
+            chunk.write_bytes(b"faux audio")
+            chunks.append(str(chunk))
+        return chunks
+
+    def _lancer(self, client_app, mode="transcript"):
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe/start", files=files, data={"mode": mode})
+        return _attendre_fin_job(client_app, resp.json()["job_id"])
+
+    def test_echec_au_second_chunk_renvoie_le_premier(self, client_app, monkeypatch, tmp_path):
+        chunks = self._chunks(tmp_path, 2)
+        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        appels = []
+
+        def _transcrire(path, retries=5):
+            appels.append(path)
+            if len(appels) == 2:
+                raise RuntimeError("quota Groq épuisé")
+            return "Premier. ", [{"start": 0.0, "end": 2.0, "text": "Premier."}]
+
+        monkeypatch.setattr(transcribe, "transcrire_chunk", _transcrire)
+
+        resp = self._lancer(client_app)
+
+        assert resp.status_code == 502
+        corps = resp.json()
+        assert "quota Groq épuisé" in corps["detail"]
+        assert corps["partial_transcript"] == "[00:00] Premier."
+
+    def test_echec_du_resume_conserve_la_transcription_complete(self, client_app, monkeypatch, tmp_path):
+        chunks = self._chunks(tmp_path, 1)
+        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(
+            transcribe, "transcrire_chunk",
+            lambda path, retries=5: ("Cours. ", [{"start": 3.0, "end": 5.0, "text": "Cours."}]),
+        )
+        fake_groq = MagicMock()
+        fake_groq.chat.completions.create.side_effect = ValueError("LLM indisponible")
+        monkeypatch.setattr(transcribe, "client", fake_groq)
+
+        resp = self._lancer(client_app, mode="summary")
+
+        assert resp.status_code == 500
+        assert resp.json()["partial_transcript"] == "[00:03] Cours."
+
+    def test_echec_sans_rien_de_transcrit_garde_la_forme_habituelle(self, client_app, monkeypatch, tmp_path):
+        chunks = self._chunks(tmp_path, 1)
+        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+
+        def _raise(*a, **k):
+            raise RuntimeError("échec immédiat")
+
+        monkeypatch.setattr(transcribe, "transcrire_chunk", _raise)
+
+        resp = self._lancer(client_app)
+
+        assert resp.status_code == 502
+        assert set(resp.json()) == {"detail"}
+
+
+class TestChunksSilencieux:
+    """Un micro coupé produit des chunks de silence numérique : ils ne doivent
+    ni consommer de quota Whisper ni produire une fiche inventée."""
+
+    def _preparer(self, monkeypatch, tmp_path, silencieux):
+        chunks = []
+        for i in range(len(silencieux)):
+            chunk = tmp_path / f"chunk_{i}.mp3"
+            chunk.write_bytes(b"faux audio")
+            chunks.append(str(chunk))
+        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(
+            transcribe, "est_silencieux", lambda path: silencieux[chunks.index(path)]
+        )
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+        appels = []
+
+        def _transcrire(path, retries=5):
+            appels.append(path)
+            return "Du texte. ", [{"start": 1.0, "end": 2.0, "text": "Du texte."}]
+
+        monkeypatch.setattr(transcribe, "transcrire_chunk", _transcrire)
+        return chunks, appels
+
+    def _lancer(self, client_app, mode="transcript"):
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe/start", files=files, data={"mode": mode})
+        return _attendre_fin_job(client_app, resp.json()["job_id"])
+
+    def test_tout_silencieux_erreur_explicite_sans_appel_whisper(self, client_app, monkeypatch, tmp_path):
+        _, appels = self._preparer(monkeypatch, tmp_path, [True, True, True])
+
+        resp = self._lancer(client_app)
+
+        assert resp.status_code == 422
+        assert "silencieux" in resp.json()["detail"]
+        assert appels == []
+
+    def test_chunks_silencieux_ignores_les_autres_transcrits(self, client_app, monkeypatch, tmp_path):
+        chunks, appels = self._preparer(monkeypatch, tmp_path, [False, True, True])
+
+        resp = self._lancer(client_app)
+
+        assert resp.status_code == 200
+        assert appels == [chunks[0]]
+        corps = resp.json()
+        assert corps["stats"]["silent_chunks"] == 2
+        assert corps["transcript"] == "[00:01] Du texte."
+
+
+class TestResumeParBlocsDansLeJob:
+    def test_longue_transcription_resumee_en_deux_etapes(self, client_app, monkeypatch, tmp_path):
+        import app.services.summary as summary
+
+        monkeypatch.setattr(summary, "SEUIL_PASSE_UNIQUE_CHARS", 500)
+        monkeypatch.setattr(summary, "TAILLE_BLOC_CHARS", 300)
+
+        chunk = tmp_path / "chunk_0.mp3"
+        chunk.write_bytes(b"faux audio")
+        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: [str(chunk)])
+        long_texte = " ".join(f"Phrase {i} " + "y" * 40 + "." for i in range(30))
+        monkeypatch.setattr(
+            transcribe, "transcrire_chunk",
+            lambda path, retries=5: (long_texte, [{"start": 0.0, "end": 1.0, "text": long_texte}]),
+        )
+
+        prompts = []
+
+        def _create(**kwargs):
+            prompts.append(kwargs["messages"][0]["content"])
+            fake = MagicMock()
+            fake.choices[0].message.content = "## Résumé\nFiche finale" if "PARTIE 1" in prompts[-1] else "notes"
+            return fake
+
+        fake_groq = MagicMock()
+        fake_groq.chat.completions.create.side_effect = _create
+        monkeypatch.setattr(transcribe, "client", fake_groq)
+
+        files = {"audio": ("reunion.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe/start", files=files)
+        résultat = _attendre_fin_job(client_app, resp.json()["job_id"])
+
+        assert résultat.status_code == 200
+        assert résultat.json()["markdown"] == "## Résumé\nFiche finale"
+        assert len(prompts) > 2  # plusieurs blocs + une fusion

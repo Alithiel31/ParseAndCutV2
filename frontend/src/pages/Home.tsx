@@ -3,7 +3,7 @@ import DropZone from "../components/DropZone";
 import AudioRecorder from "../components/AudioRecorder";
 import ProgressSteps, { STEPS } from "../components/ProgressSteps";
 import ResultView from "../components/ResultView";
-import { resumeTranscription, transcribeAudio, type JobProgress, type TranscribeMode, type TranscribeResult } from "../api";
+import { ApiError, resumeTranscription, transcribeAudio, type JobProgress, type TranscribeMode, type TranscribeResult } from "../api";
 import { useLanguage, useTranslation, type Lang } from "../i18n";
 import { getPermission, isNotificationSupported, notifyResult, requestPermission } from "../notifications";
 
@@ -62,6 +62,7 @@ export default function Home() {
   const [statusText, setStatusText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TranscribeResult | null>(null);
+  const [partialTranscript, setPartialTranscript] = useState<string | null>(null);
   const [isResumed, setIsResumed] = useState(false);
   const [recorderBusy, setRecorderBusy] = useState(false);
   const [notifyEnabled, setNotifyEnabled] = useState(() => {
@@ -134,7 +135,14 @@ export default function Home() {
       );
     } else if (progress.step === "llm") {
       setActiveStep("step-llm");
-      setStatusText(t("home.status.structuring"));
+      setStatusText(
+        progress.summaryTotal && progress.summaryTotal > 1
+          ? t("home.status.structuringProgress", {
+              current: progress.summaryCurrent ?? 1,
+              total: progress.summaryTotal,
+            })
+          : t("home.status.structuring")
+      );
     }
   }
 
@@ -154,6 +162,7 @@ export default function Home() {
   function handleJobError(e: unknown) {
     clearPendingJob();
     setError(e instanceof Error ? e.message : t("home.errors.unknown"));
+    setPartialTranscript(e instanceof ApiError && e.partialTranscript ? e.partialTranscript : null);
     setPhase("error");
   }
 
@@ -165,6 +174,7 @@ export default function Home() {
     }
     setError(null);
     setResult(null);
+    setPartialTranscript(null);
     setPhase("loading");
     setIsResumed(false);
     setActiveStep(STEPS[0].id);
@@ -220,7 +230,12 @@ export default function Home() {
           }}
         />
 
-        {error && <div className="error-banner" role="alert">⚠️ {error}</div>}
+        {error && (
+          <div className="error-banner" role="alert">
+            ⚠️ {error}
+            {partialTranscript && <> {t("home.errors.partialRecovered")}</>}
+          </div>
+        )}
 
         <div className="mode-selector" role="radiogroup" aria-label={t("home.modeSelector.label")}>
           <label className={`mode-option${mode === "summary" ? " active" : ""}`}>
@@ -283,6 +298,12 @@ export default function Home() {
           </div>
           <ProgressSteps activeId={activeStep} mode={mode} />
           <p className="processing-note">{t(isResumed ? "home.progress.resumed" : "home.progress.note")}</p>
+        </div>
+      )}
+
+      {partialTranscript && !result && (
+        <div>
+          <ResultView mode="transcript" transcript={partialTranscript} />
         </div>
       )}
 

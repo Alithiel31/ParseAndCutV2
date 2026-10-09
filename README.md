@@ -44,7 +44,7 @@ This project covers, end to end:
 - **AI**: Groq API — Whisper Large V3 (transcription) + GPT-OSS 120B (structuring)
 - **Frontend**: [`frontend/`](./frontend) — React + Vite Progressive Web App, packaged as a TWA (Trusted Web Activity) for Android
 - **Containerization & deployment**: Docker Compose (backend + frontend containers), Raspberry Pi target via a `docker context`, Cloudflare Tunnel for HTTPS/public access with no port forwarding — see [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md)
-- **CI/CD**: GitHub Actions — linting (flake8 for the backend, oxlint for the frontend), unit tests (pytest), and integration tests (FastAPI app boot, `/health`, `/process` error paths) on every push/PR
+- **CI/CD**: GitHub Actions — linting (flake8 for the backend, oxlint for the frontend), unit tests (pytest), and integration tests (FastAPI app boot, `/health`, `/api/transcribe/start` error paths) on every push/PR
 - **Operational history**: migrated the hosting platform from Railway to a self-hosted Docker/Pi setup — see [`docs/Troubleshooting.md`](./docs/Troubleshooting.md)
 - **Documentation**: versioned changelog ([Keep a Changelog](https://keepachangelog.com/en/1.0.0/)), tagged releases (SemVer)
 
@@ -104,7 +104,7 @@ Nginx (frontend container) serves the PWA static files and reverse-proxies `/api
 | `FFMPEG_PATH` | ❌ | `ffmpeg` | Path to the FFmpeg binary |
 | `CORS_ORIGINS` | ❌ | `https://parseandcut.alithiel31.dev` | Comma-separated allowed origins — override for local dev (Vite on `:5173` calling Uvicorn on `:5000`) |
 | `MAX_UPLOAD_SIZE_MB` | ❌ | `100` | Max upload size enforced by the backend (in addition to nginx's `client_max_body_size`) — matches Cloudflare's own proxy ceiling on Free/Pro plans |
-| `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Rate limit on `/process` (per IP), format `N/period` |
+| `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Rate limit on `/api/transcribe/start` (per IP), format `N/period` |
 | `FLASK_DEBUG` | ❌ | `false` | Debug mode (dev only) |
 
 > **Production note:** on the Caesura deployment, `GROQ_API_KEY` is not read from `.env` — it's injected at deploy time via Infisical (see `docs/DEPLOY_PI.md`). For local development, set it directly in your `.env` as described below.
@@ -170,7 +170,7 @@ pytest
 Two workflows run on every push/PR to `main`:
 
 - **CI Lint** (`.github/workflows/lint.yml`): flake8 (backend), oxlint (frontend)
-- **CI Integration** (`.github/workflows/integration.yml`): runs the pytest suite, then boots the FastAPI app and checks `/`, `/health`, and the `/process` error paths (missing file → 400, unsupported format → 415)
+- **CI Integration** (`.github/workflows/integration.yml`): runs the pytest suite, then boots the FastAPI app and checks `/`, `/health`, and the `/api/transcribe/start` error paths (missing file → 400, unsupported format → 415)
 
 ## Releases & versioning
 

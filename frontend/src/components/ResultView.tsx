@@ -8,7 +8,7 @@ interface ResultViewProps {
   mode: TranscribeMode;
   markdown?: string;
   transcript?: string;
-  stats: TranscribeStats;
+  stats?: TranscribeStats;
 }
 
 export default function ResultView({ mode, markdown, transcript, stats }: ResultViewProps) {
@@ -57,10 +57,12 @@ export default function ResultView({ mode, markdown, transcript, stats }: Result
         {copyState === "copied" ? t("result.copied") : copyState === "failed" ? t("result.copyFailed") : ""}
       </p>
 
-      <div className="stats-bar">
-        <span>{t("result.chunks", { count: stats.chunks })}</span>
-        <span>{t("result.chars", { count: stats.transcription_chars.toLocaleString() })}</span>
-      </div>
+      {stats && (
+        <div className="stats-bar">
+          <span>{t("result.chunks", { count: stats.chunks })}</span>
+          <span>{t("result.chars", { count: stats.transcription_chars.toLocaleString() })}</span>
+        </div>
+      )}
 
       {isSummary ? (
         <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />

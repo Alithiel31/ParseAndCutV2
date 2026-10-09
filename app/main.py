@@ -1,6 +1,6 @@
 """
-Point d'entrée FastAPI. Backend API pur — le frontend (PWA) est un repo séparé
-(ParseAndCutPWA) qui consomme cette API via /api/transcribe (cf. app/config.py CORS_ORIGINS).
+Point d'entrée FastAPI. Backend API pur — le frontend (PWA, dossier frontend/) consomme cette API via
+/api/transcribe/start et /api/transcribe/status/{job_id} (cf. app/config.py CORS_ORIGINS).
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

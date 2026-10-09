@@ -44,7 +44,7 @@ Ce projet couvre, de bout en bout :
 - **IA** : API Groq — Whisper Large V3 (transcription) + GPT-OSS 120B (structuration)
 - **Frontend** : [`frontend/`](./frontend) — Progressive Web App React + Vite, packagée en TWA (Trusted Web Activity) pour Android
 - **Conteneurisation & déploiement** : Docker Compose (conteneurs backend + frontend), cible Raspberry Pi via un `docker context`, tunnel Cloudflare pour le HTTPS/l'accès public sans ouverture de port — voir [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md)
-- **CI/CD** : GitHub Actions — lint (flake8 pour le backend, oxlint pour le frontend), tests unitaires (pytest) et tests d'intégration (démarrage de l'app FastAPI, `/health`, cas d'erreur de `/process`) à chaque push/PR
+- **CI/CD** : GitHub Actions — lint (flake8 pour le backend, oxlint pour le frontend), tests unitaires (pytest) et tests d'intégration (démarrage de l'app FastAPI, `/health`, cas d'erreur de `/api/transcribe/start`) à chaque push/PR
 - **Historique opérationnel** : migration de la plateforme d'hébergement de Railway vers une infra auto-hébergée Docker/Pi — voir [`docs/Troubleshooting.fr.md`](./docs/Troubleshooting.fr.md)
 - **Documentation** : changelog versionné ([Keep a Changelog](https://keepachangelog.com/en/1.0.0/)), releases taguées (SemVer)
 
@@ -104,7 +104,7 @@ Nginx (conteneur frontend) sert les fichiers statiques du PWA et reverse-proxy `
 | `FFMPEG_PATH` | ❌ | `ffmpeg` | Chemin vers le binaire FFmpeg |
 | `CORS_ORIGINS` | ❌ | `https://parseandcut.alithiel31.dev` | Origines autorisées séparées par des virgules — à surcharger en dev local (Vite sur `:5173` qui tape sur Uvicorn sur `:5000`) |
 | `MAX_UPLOAD_SIZE_MB` | ❌ | `100` | Taille max d'upload vérifiée côté backend (en plus du `client_max_body_size` de nginx) — aligné sur le plafond du proxy Cloudflare sur les plans Free/Pro |
-| `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Limite de requêtes sur `/process` (par IP), format `N/period` |
+| `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Limite de requêtes sur `/api/transcribe/start` (par IP), format `N/period` |
 | `FLASK_DEBUG` | ❌ | `false` | Mode debug (dev uniquement) |
 
 > **Note production :** sur le déploiement Caesura, `GROQ_API_KEY` n'est pas lue depuis `.env` — elle est injectée au déploiement via Infisical (voir `docs/DEPLOY_PI.md`). Pour le développement local, renseigne-la directement dans ton `.env` comme décrit ci-dessous.
@@ -170,7 +170,7 @@ pytest
 Deux workflows tournent à chaque push/PR sur `main` :
 
 - **CI Lint** (`.github/workflows/lint.yml`) : flake8 (backend), oxlint (frontend)
-- **CI Integration** (`.github/workflows/integration.yml`) : lance la suite pytest, puis démarre l'app FastAPI et vérifie `/`, `/health`, ainsi que les cas d'erreur de `/process` (fichier manquant → 400, format non supporté → 415)
+- **CI Integration** (`.github/workflows/integration.yml`) : lance la suite pytest, puis démarre l'app FastAPI et vérifie `/`, `/health`, ainsi que les cas d'erreur de `/api/transcribe/start` (fichier manquant → 400, format non supporté → 415)
 
 ## Releases & versioning
 
