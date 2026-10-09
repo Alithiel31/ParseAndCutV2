@@ -20,6 +20,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ffmpeg_timeout": "Le découpage audio a pris trop de temps",
         "transcription_empty": "Transcription vide — audio silencieux, inaudible ou langue incorrecte ?",
         "transcription_error": "Erreur de transcription : {error}",
+        "audio_silent": (
+            "Enregistrement silencieux : aucun son n'a été capté. Le micro a probablement été "
+            "coupé (écran verrouillé, changement d'application). Gardez l'écran allumé pendant "
+            "l'enregistrement et réessayez."
+        ),
         "groq_api_error": "Erreur API Groq : {error}",
         "internal_error": "Erreur interne du serveur",
         "job_not_found": "Job introuvable ou déjà récupéré",
@@ -35,6 +40,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ffmpeg_timeout": "Audio splitting took too long",
         "transcription_empty": "Empty transcription — silent audio, inaudible, or wrong language?",
         "transcription_error": "Transcription error: {error}",
+        "audio_silent": (
+            "Silent recording: no sound was captured. The microphone was probably muted "
+            "(screen locked, app switched). Keep the screen on while recording and try again."
+        ),
         "groq_api_error": "Groq API error: {error}",
         "internal_error": "Internal server error",
         "job_not_found": "Job not found or already retrieved",

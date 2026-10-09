@@ -275,3 +275,53 @@ class TestTranscriptionPartielle:
 
         assert resp.status_code == 502
         assert set(resp.json()) == {"detail"}
+
+
+class TestChunksSilencieux:
+    """Un micro coupé produit des chunks de silence numérique : ils ne doivent
+    ni consommer de quota Whisper ni produire une fiche inventée."""
+
+    def _preparer(self, monkeypatch, tmp_path, silencieux):
+        chunks = []
+        for i in range(len(silencieux)):
+            chunk = tmp_path / f"chunk_{i}.mp3"
+            chunk.write_bytes(b"faux audio")
+            chunks.append(str(chunk))
+        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(
+            transcribe, "est_silencieux", lambda path: silencieux[chunks.index(path)]
+        )
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+        appels = []
+
+        def _transcrire(path, retries=5):
+            appels.append(path)
+            return "Du texte. ", [{"start": 1.0, "end": 2.0, "text": "Du texte."}]
+
+        monkeypatch.setattr(transcribe, "transcrire_chunk", _transcrire)
+        return chunks, appels
+
+    def _lancer(self, client_app, mode="transcript"):
+        files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
+        resp = client_app.post("/api/transcribe/start", files=files, data={"mode": mode})
+        return _attendre_fin_job(client_app, resp.json()["job_id"])
+
+    def test_tout_silencieux_erreur_explicite_sans_appel_whisper(self, client_app, monkeypatch, tmp_path):
+        _, appels = self._preparer(monkeypatch, tmp_path, [True, True, True])
+
+        resp = self._lancer(client_app)
+
+        assert resp.status_code == 422
+        assert "silencieux" in resp.json()["detail"]
+        assert appels == []
+
+    def test_chunks_silencieux_ignores_les_autres_transcrits(self, client_app, monkeypatch, tmp_path):
+        chunks, appels = self._preparer(monkeypatch, tmp_path, [False, True, True])
+
+        resp = self._lancer(client_app)
+
+        assert resp.status_code == 200
+        assert appels == [chunks[0]]
+        corps = resp.json()
+        assert corps["stats"]["silent_chunks"] == 2
+        assert corps["transcript"] == "[00:01] Du texte."

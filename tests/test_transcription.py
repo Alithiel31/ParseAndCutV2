@@ -170,3 +170,67 @@ class TestRetries:
         assert fake_client.audio.transcriptions.create.call_count == transcription.MAX_TENTATIVES
         # Pas d'attente inutile après la dernière tentative.
         assert len(pauses) == transcription.MAX_TENTATIVES - 1
+
+
+def _seg(texte, no_speech_prob=0.01, avg_logprob=-0.2, start=0.0):
+    return {
+        "start": start, "end": start + 2.0, "text": texte,
+        "no_speech_prob": no_speech_prob, "avg_logprob": avg_logprob,
+    }
+
+
+class TestFiltreHallucinations:
+    def _transcrire(self, monkeypatch, tmp_path, segments, text="brut"):
+        chunk = tmp_path / "chunk.mp3"
+        chunk.write_bytes(b"faux audio")
+        fake_client = MagicMock()
+        fake_client.audio.transcriptions.create.return_value = _fake_groq_response(text, segments)
+        monkeypatch.setattr(transcription, "client", fake_client)
+        return transcription.transcrire_chunk(str(chunk))
+
+    def test_phrase_connue_supprimee_sans_condition(self, monkeypatch, tmp_path):
+        # Cas réel : la sortie de ton enregistrement muet.
+        texte, segments = self._transcrire(monkeypatch, tmp_path, [
+            _seg("On va passer à travers."),
+            _seg("Sous-titrage Société Radio-Canada", no_speech_prob=0.01, start=30.0),
+        ])
+        assert [s["text"] for s in segments] == ["On va passer à travers."]
+        assert texte == "On va passer à travers."
+
+    def test_you_repete_sur_silence_supprime(self, monkeypatch, tmp_path):
+        _, segments = self._transcrire(monkeypatch, tmp_path, [
+            _seg("you", no_speech_prob=0.9),
+            _seg("you you", no_speech_prob=0.8, start=30.0),
+            _seg("You.", no_speech_prob=0.7, start=60.0),
+        ])
+        assert segments == []
+
+    def test_you_dit_pour_de_vrai_conserve(self, monkeypatch, tmp_path):
+        # no_speech_prob très bas : Whisper est sûr qu'il y a de la parole.
+        _, segments = self._transcrire(monkeypatch, tmp_path, [_seg("Thank you.", no_speech_prob=0.02)])
+        assert [s["text"] for s in segments] == ["Thank you."]
+
+    def test_critere_whisper_no_speech_et_logprob_bas(self, monkeypatch, tmp_path):
+        _, segments = self._transcrire(monkeypatch, tmp_path, [
+            _seg("Un texte inventé quelconque", no_speech_prob=0.85, avg_logprob=-1.4),
+        ])
+        assert segments == []
+
+    def test_parole_peu_sure_mais_probable_conservee(self, monkeypatch, tmp_path):
+        # no_speech_prob élevé SEUL ne suffit pas : il faut aussi un logprob bas.
+        _, segments = self._transcrire(monkeypatch, tmp_path, [
+            _seg("Ceci est un vrai passage", no_speech_prob=0.7, avg_logprob=-0.3),
+        ])
+        assert len(segments) == 1
+
+    def test_rien_supprime_garde_le_texte_brut_de_whisper(self, monkeypatch, tmp_path):
+        texte, _ = self._transcrire(monkeypatch, tmp_path, [_seg("Bonjour.")], text="Bonjour. ")
+        assert texte == "Bonjour. "
+
+    def test_segments_sans_metriques_conserves(self, monkeypatch, tmp_path):
+        # Réponse sans no_speech_prob/avg_logprob : on ne filtre que les phrases connues.
+        _, segments = self._transcrire(monkeypatch, tmp_path, [
+            {"start": 0.0, "end": 1.0, "text": "Bonjour"},
+            {"start": 1.0, "end": 2.0, "text": "you"},
+        ])
+        assert [s["text"] for s in segments] == ["Bonjour", "you"]

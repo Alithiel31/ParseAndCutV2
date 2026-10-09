@@ -10,6 +10,13 @@ from typing import Optional
 from app.config import ALLOWED_EXTENSIONS, CHUNK_DURATION, FFMPEG_PATH, logger
 
 _DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d{2}):(\d{2})\.(\d+)")
+_MAX_VOLUME_RE = re.compile(r"max_volume:\s*(-?\d+(?:\.\d+)?)\s*dB")
+
+# Pic en dessous duquel un chunk est considéré comme vide. FFmpeg mesure -91 dB
+# pour du silence numérique parfait (micro coupé par le navigateur) ; un bruit
+# de fond, même très faible, reste autour de -60 dB. -70 dB ne rejette donc que
+# du vrai vide, jamais un enregistrement simplement discret.
+SEUIL_SILENCE_DB = -70.0
 
 
 def allowed_file(filename: str) -> bool:
@@ -37,6 +44,30 @@ def obtenir_duree_audio(input_path: str) -> Optional[float]:
             h, m, s, frac = match.groups()
             return int(h) * 3600 + int(m) * 60 + int(s) + int(frac) / 10 ** len(frac)
     return None
+
+
+def mesurer_pic_sonore(path: str) -> Optional[float]:
+    """Pic sonore (max_volume, en dB) d'un fichier audio, mesuré par FFmpeg
+    (filtre volumedetect). Retourne None si la mesure est impossible
+    (FFmpeg absent, fichier illisible) : dans le doute, l'appelant doit traiter
+    le fichier normalement plutôt que de le rejeter."""
+    try:
+        probe = subprocess.run(
+            [FFMPEG_PATH, "-hide_banner", "-i", path, "-vn", "-af", "volumedetect", "-f", "null", "-"],
+            capture_output=True, text=True, timeout=120
+        )
+    except Exception:
+        return None
+
+    match = _MAX_VOLUME_RE.search(probe.stderr)
+    return float(match.group(1)) if match else None
+
+
+def est_silencieux(path: str) -> bool:
+    """True si le fichier ne contient que du silence (pic < SEUIL_SILENCE_DB).
+    False si le fichier a du son OU si la mesure a échoué."""
+    pic = mesurer_pic_sonore(path)
+    return pic is not None and pic < SEUIL_SILENCE_DB
 
 
 def découper_audio(

@@ -17,7 +17,7 @@ from werkzeug.utils import secure_filename
 from app.config import CHUNK_DURATION, LANGUAGE, MAX_UPLOAD_SIZE_MB, RATE_LIMIT_PROCESS, client, logger
 from app.i18n import SUPPORTED_LANGS, t
 from app.limiter import limiter
-from app.services.audio import allowed_file, découper_audio, obtenir_duree_audio, ALLOWED_EXTENSIONS
+from app.services.audio import allowed_file, découper_audio, est_silencieux, obtenir_duree_audio, ALLOWED_EXTENSIONS
 from app.services.jobs import create_job, delete_job, get_job, update_job
 from app.services.prompt import construire_prompt
 from app.services.transcription import transcrire_chunk
@@ -173,11 +173,21 @@ def _executer_pipeline(
             on_progress(step="whisper", chunk_total=len(chunks_créés))
         texte_complet = ""
         segments_horodatés = []
+        chunks_silencieux = 0
 
         for i, path in enumerate(chunks_créés):
             if on_progress:
                 on_progress(chunk_current=i + 1)
             logger.info(f"  {log_prefix}[{i+1}/{len(chunks_créés)}] {os.path.basename(path)}")
+
+            # Un chunk de silence numérique (micro coupé) ferait halluciner
+            # Whisper et consommerait du quota Groq pour rien.
+            if est_silencieux(path):
+                logger.warning(f"  {log_prefix}chunk {i+1} silencieux — ignoré")
+                chunks_silencieux += 1
+                os.remove(path)
+                continue
+
             texte_chunk, segments = transcrire_chunk(path)
             texte_complet += texte_chunk + " "
 
@@ -194,7 +204,8 @@ def _executer_pipeline(
                 on_progress(partial_transcript=_formater_transcript(segments_horodatés))
 
         if not texte_complet.strip():
-            raise _ErreurPipeline(422, t("transcription_empty", lang))
+            raison = "audio_silent" if chunks_silencieux == len(chunks_créés) else "transcription_empty"
+            raise _ErreurPipeline(422, t(raison, lang))
 
         logger.info(f"✅ {log_prefix}Transcription complète : {len(texte_complet):,} caractères")
 
@@ -202,7 +213,8 @@ def _executer_pipeline(
             "mode": mode,
             "stats": {
                 "chunks":               len(chunks_créés),
-                "transcription_chars":  len(texte_complet)
+                "transcription_chars":  len(texte_complet),
+                "silent_chunks":        chunks_silencieux
             }
         }
 
