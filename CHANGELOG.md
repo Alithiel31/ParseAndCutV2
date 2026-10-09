@@ -29,6 +29,27 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
 - The audio recorder keeps the screen on (Screen Wake Lock) and warns immediately if the browser
   mutes the microphone, which silently produced empty recordings on Android when the screen turned off
 
+- Segmented recording API (`/api/recordings`): the browser can send a long recording in
+  self-contained segments (~5 min) while it is still running, instead of one file at the end,
+  so a crashed tab or a lost connection no longer loses the whole recording. The segments are
+  assembled and processed by the same pipeline and job tracking as a regular upload; a missing
+  segment is reported (HTTP 409 + `missing`) so the client can resend it. Upload requests are
+  idempotent per segment. The audio is stored on the server only until processing ends (or 6 h
+  if abandoned)
+- The in-browser recorder now also records the microphone in 5-minute segments and uploads them
+  while the meeting is running (progress shown as "x/y segments sent"). When all segments are on
+  the server, processing starts without re-uploading the file; if the backup is unavailable or
+  incomplete, the full recording is uploaded as before, so nothing depends on it. The next segment
+  is started before the previous one is stopped, so there is no gap at segment boundaries
+- Interrupted recordings can be resumed: the audio recorded so far (finished segments plus
+  one-second pieces of the segment in progress) is saved on the device in IndexedDB. After a tab
+  crash, a reload or leaving the page, the home page offers to resume and process it (all segments
+  are re-sent to a fresh server session, so it works even if the previous one expired) or to delete it.
+  At most ~1 s of audio is lost. The local copy is deleted once processing has started, or after 24 h
+- Privacy pages and footer updated to match what is actually stored: audio segments on the server
+  until processing ends (6 h max if a recording is abandoned), the result file until retrieved
+  (2 h max), and the local-storage / IndexedDB entries on the device
+
 ### Removed
 
 - **Breaking:** the synchronous `POST /process` and `POST /api/transcribe` endpoints. They could

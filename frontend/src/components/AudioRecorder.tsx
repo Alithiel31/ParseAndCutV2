@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useTranslation } from "../i18n";
+import { useLanguage, useTranslation } from "../i18n";
+import { SegmentedRecording, type RecordedUpload, type SegmentSyncStatus } from "../segmentedRecording";
 
 const MAX_RECORDING_BYTES = 100 * 1024 * 1024;
 const MIME_CANDIDATES = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm", "audio/ogg;codecs=opus"];
@@ -10,7 +11,9 @@ interface AudioRecorderProps {
   disabled: boolean;
   onActivityChange: (active: boolean) => void;
   onRecordingStart: () => void;
-  onFileReady: (file: File) => void;
+  // `upload` : état de la sauvegarde par segments (`complete` : tout est déjà sur le serveur).
+  // Absent, c'est le fichier complet qu'il faudra envoyer.
+  onFileReady: (file: File, upload?: RecordedUpload) => void;
 }
 
 function formatTime(milliseconds: number): string {
@@ -38,6 +41,7 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [micMuted, setMicMuted] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SegmentSyncStatus | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -45,7 +49,9 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
   const sizeExceededRef = useRef(false);
   const recorderFailedRef = useRef(false);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const segmentsRef = useRef<SegmentedRecording | null>(null);
   const { t } = useTranslation();
+  const { lang } = useLanguage();
 
   useEffect(() => {
     if (!recordedFile) {
@@ -65,6 +71,9 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
 
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
+    // Page quittée en pleine réunion : l'audio déjà enregistré reste sur l'appareil et
+    // sera proposé à la reprise au prochain affichage.
+    segmentsRef.current?.detach();
     void releaseWakeLock();
   }, []);
 
@@ -124,6 +133,10 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
     if (disabled || phase === "preparing" || phase === "recording" || phase === "paused" || phase === "stopping") return;
     setError(null);
     setAnnouncement("");
+    // Un enregistrement précédent non terminé : on libère ses copies (serveur et appareil).
+    segmentsRef.current?.discard();
+    segmentsRef.current = null;
+    setSyncStatus(null);
     setPhase("preparing");
     onActivityChange(true);
 
@@ -172,28 +185,52 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
         if (recorder.state !== "inactive") recorder.stop();
       };
 
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        closeStream();
-        onActivityChange(false);
+        const segments = segmentsRef.current;
+        segmentsRef.current = null;
 
         if (sizeExceededRef.current || recorderFailedRef.current || blob.size === 0) {
+          // On garde la sauvegarde par segments : elle peut encore être reprise depuis l'accueil.
+          segments?.detach();
+          closeStream();
+          onActivityChange(false);
           if (!sizeExceededRef.current && !recorderFailedRef.current) setError(t("recorder.error.empty"));
           setPhase("error");
           setAnnouncement(t("recorder.status.error"));
           return;
         }
 
+        // Les segments s'arrêtent AVANT la fermeture du micro, puis on attend brièvement
+        // l'envoi du dernier : sinon la fermeture des pistes couperait le dernier segment.
+        const upload = (await segments?.stop()) ?? null;
+        if (upload && !upload.complete) {
+          // Envoi incomplet : le fichier complet fera foi. La copie serveur partielle est
+          // inutile, mais la sauvegarde locale reste jusqu'au démarrage du traitement.
+          segments?.abandonServerCopy();
+        }
+        closeStream();
+        onActivityChange(false);
+
         const mimeType = blob.type || "audio/webm";
         const file = new File([blob], `enregistrement-audio.${extensionForMimeType(mimeType)}`, { type: mimeType });
         setRecordedFile(file);
-        onFileReady(file);
+        onFileReady(file, upload ?? undefined);
         setPhase("ready");
         setAnnouncement(t("recorder.status.ready"));
       };
 
       recorder.start(1000);
       void acquireWakeLock();
+      // Filet de sécurité : le même micro est aussi enregistré en segments envoyés au fil
+      // de l'eau. Si ça échoue (navigateur, réseau), l'enregistrement continu suffit.
+      try {
+        const segments = new SegmentedRecording(stream, recorder.mimeType || mimeType || "", lang, setSyncStatus);
+        segments.start();
+        segmentsRef.current = segments;
+      } catch {
+        segmentsRef.current = null;
+      }
       onRecordingStart();
       setPhase("recording");
       setAnnouncement(t("recorder.status.recording"));
@@ -210,6 +247,7 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
     const recorder = recorderRef.current;
     if (!recorder || recorder.state !== "recording") return;
     recorder.pause();
+    segmentsRef.current?.pause();
     setPhase("paused");
     setAnnouncement(t("recorder.status.paused"));
   }
@@ -218,6 +256,7 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
     const recorder = recorderRef.current;
     if (!recorder || recorder.state !== "paused") return;
     recorder.resume();
+    segmentsRef.current?.resume();
     setPhase("recording");
     setAnnouncement(t("recorder.status.recording"));
   }
@@ -265,6 +304,13 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
       )}
 
       {busy && !micMuted && <p className="recorder-hint">{t("recorder.hint.keepAwake")}</p>}
+      {busy && syncStatus && syncStatus.total > 0 && (
+        <p className="recorder-hint">
+          {syncStatus.failed
+            ? t("recorder.sync.failed")
+            : t("recorder.sync.progress", { sent: syncStatus.sent, total: syncStatus.total })}
+        </p>
+      )}
       {micMuted && busy && <p className="recorder-error" role="alert">{t("recorder.warning.micMuted")}</p>}
       {error && <p className="recorder-error" role="alert">{error}</p>}
 

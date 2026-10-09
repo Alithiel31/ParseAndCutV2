@@ -28,6 +28,13 @@ MESSAGES: dict[str, dict[str, str]] = {
         "groq_api_error": "Erreur API Groq : {error}",
         "internal_error": "Erreur interne du serveur",
         "job_not_found": "Job introuvable ou déjà récupéré",
+        "recording_not_found": "Enregistrement introuvable ou expiré",
+        "recording_finished": "Cet enregistrement est déjà en cours de traitement",
+        "segment_invalid_index": "Numéro de segment invalide (0 à {max_index} attendu)",
+        "segment_too_large": "Segment trop volumineux (max {max_mb} Mo)",
+        "recording_too_large": "Enregistrement trop volumineux (max {max_mb} Mo au total)",
+        "segments_missing": "Segments manquants : {missing}",
+        "recording_empty": "Aucun segment reçu pour cet enregistrement",
     },
     "en": {
         "invalid_lang": "Langue invalide (fr/en attendu) / Invalid language (expected fr/en)",
@@ -47,6 +54,13 @@ MESSAGES: dict[str, dict[str, str]] = {
         "groq_api_error": "Groq API error: {error}",
         "internal_error": "Internal server error",
         "job_not_found": "Job not found or already retrieved",
+        "recording_not_found": "Recording not found or expired",
+        "recording_finished": "This recording is already being processed",
+        "segment_invalid_index": "Invalid segment number (expected 0 to {max_index})",
+        "segment_too_large": "Segment too large (max {max_mb} MB)",
+        "recording_too_large": "Recording too large (max {max_mb} MB in total)",
+        "segments_missing": "Missing segments: {missing}",
+        "recording_empty": "No segment received for this recording",
     },
 }
 

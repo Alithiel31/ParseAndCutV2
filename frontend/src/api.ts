@@ -46,10 +46,25 @@ const MAX_POLL_MS = 30 * 60 * 1000; // garde-fou : 30 min sans résultat = aband
 export class ApiError extends Error {
   // Texte déjà transcrit avant l'échec du job (quota, réseau, panne du résumé IA…).
   partialTranscript?: string;
+  // Code HTTP de la réponse en erreur, si l'erreur vient d'une réponse du serveur.
+  status?: number;
 
-  constructor(message: string, partialTranscript?: string) {
+  constructor(message: string, partialTranscript?: string, status?: number) {
     super(message);
     this.partialTranscript = partialTranscript;
+    this.status = status;
+  }
+}
+
+// Échec d'envoi d'un segment d'enregistrement. `retryable` : coupure réseau,
+// 429 ou erreur serveur (ça peut passer plus tard) ; sinon (404, 413, 415…) le
+// renvoyer à l'identique échouerait à chaque fois.
+export class SegmentUploadError extends Error {
+  retryable: boolean;
+
+  constructor(message: string, retryable: boolean) {
+    super(message);
+    this.retryable = retryable;
   }
 }
 
@@ -62,7 +77,8 @@ async function lireErreur(response: Response, lang: Lang): Promise<never> {
     .catch(() => ({ detail: translate(lang, "api.httpError", { status: response.status }) }));
   throw new ApiError(
     err.detail || translate(lang, "api.genericError", { status: response.status }),
-    typeof err.partial_transcript === "string" && err.partial_transcript ? err.partial_transcript : undefined
+    typeof err.partial_transcript === "string" && err.partial_transcript ? err.partial_transcript : undefined,
+    response.status
   );
 }
 
@@ -88,6 +104,88 @@ export async function transcribeAudio(
   }
 
   const { job_id: jobId } = (await startResponse.json()) as { job_id: string };
+  onJobStarted?.(jobId);
+
+  return followTranscriptionJob(jobId, lang, onProgress);
+}
+
+// --- Enregistrement par segments (POST /api/recordings…) ---
+// Le navigateur envoie l'audio au fil de la réunion, par segments autonomes :
+// un onglet qui plante ou une coupure réseau ne fait plus perdre tout
+// l'enregistrement. Le traitement final réutilise le même job que /start.
+
+export interface RecordingSession {
+  recordingId: string;
+  segmentSeconds: number;
+}
+
+export async function createRecording(lang: Lang): Promise<RecordingSession> {
+  const response = await fetch(`${API_URL}/api/recordings?lang=${lang}`, { method: "POST" });
+  if (!response.ok) {
+    await lireErreur(response, lang);
+  }
+  const data = await response.json();
+  return { recordingId: data.recording_id, segmentSeconds: data.segment_seconds };
+}
+
+export async function uploadSegment(
+  recordingId: string,
+  index: number,
+  blob: Blob,
+  filename: string,
+  lang: Lang
+): Promise<void> {
+  const formData = new FormData();
+  formData.append("audio", blob, filename);
+  formData.append("lang", lang);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/recordings/${recordingId}/segments/${index}`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch {
+    throw new SegmentUploadError("network", true);
+  }
+
+  if (!response.ok) {
+    const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+    throw new SegmentUploadError(`HTTP ${response.status}`, retryable);
+  }
+}
+
+// Meilleur effort : le serveur nettoie de toute façon un enregistrement abandonné.
+export async function cancelRecording(recordingId: string, lang: Lang): Promise<void> {
+  try {
+    await fetch(`${API_URL}/api/recordings/${recordingId}/cancel?lang=${lang}`, { method: "POST" });
+  } catch {
+    // hors ligne : rien à faire
+  }
+}
+
+// Termine un enregistrement par segments et suit le job comme un envoi classique.
+export async function transcribeRecording(
+  recordingId: string,
+  mode: TranscribeMode = "summary",
+  lang: Lang = "fr",
+  onProgress?: (progress: JobProgress) => void,
+  onJobStarted?: (jobId: string) => void
+): Promise<TranscribeResult> {
+  const formData = new FormData();
+  formData.append("mode", mode);
+  formData.append("lang", lang);
+
+  const finishResponse = await fetch(`${API_URL}/api/recordings/${recordingId}/finish`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!finishResponse.ok) {
+    await lireErreur(finishResponse, lang);
+  }
+
+  const { job_id: jobId } = (await finishResponse.json()) as { job_id: string };
   onJobStarted?.(jobId);
 
   return followTranscriptionJob(jobId, lang, onProgress);

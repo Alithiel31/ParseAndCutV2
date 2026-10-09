@@ -99,25 +99,39 @@ export default function ConfidentialiteContentFr() {
       </p>
 
       <h3>6. Durée de conservation</h3>
-      <p>C'est le point le plus important de ce service : il ne conserve rien.</p>
+      <p>
+        C'est le point le plus important de ce service : il ne conserve aucun contenu au-delà du
+        traitement.
+      </p>
       <ul>
         <li>
-          Le fichier audio est écrit dans un répertoire temporaire du serveur uniquement pendant
-          le traitement, puis <strong>supprimé en fin de requête</strong>, y compris lorsqu'une
-          erreur survient en cours de route.
+          Le fichier audio que vous déposez est écrit dans un répertoire temporaire du serveur
+          uniquement pendant le traitement, puis <strong>supprimé à la fin du traitement</strong>,
+          y compris lorsqu'une erreur survient en cours de route.
         </li>
         <li>
-          Le fichier est découpé en segments de dix minutes ; chaque segment est{" "}
+          Lorsque vous enregistrez depuis le micro, l'audio est envoyé au serveur{" "}
+          <strong>par segments, au fil de l'enregistrement</strong>, pour qu'un incident (onglet
+          fermé, perte de connexion) ne fasse pas perdre toute la réunion. Ces segments restent
+          dans le répertoire temporaire du serveur pendant l'enregistrement puis le traitement,
+          et sont <strong>supprimés à la fin du traitement</strong> (ou dès que vous abandonnez
+          l'enregistrement). Un enregistrement jamais terminé est supprimé automatiquement{" "}
+          <strong>au bout de 6 heures au plus</strong>.
+        </li>
+        <li>
+          Pour la transcription, l'audio est découpé en tronçons ; chaque tronçon est{" "}
           <strong>supprimé immédiatement après sa transcription</strong>.
         </li>
         <li>
-          La transcription et la fiche générée sont traitées <strong>en mémoire uniquement</strong>,
-          renvoyées à votre navigateur, et ne sont jamais écrites sur disque. Le service ne
-          dispose d'aucune base de données.
+          Le texte transcrit et la fiche générée sont conservés dans un petit fichier temporaire
+          du serveur, le temps que votre navigateur les récupère :{" "}
+          <strong>supprimé dès sa récupération</strong>, et au plus tard 2 heures après si vous ne
+          le récupérez jamais. Le service ne dispose d'aucune base de données.
         </li>
         <li>
-          La durée effective de conservation est donc celle du traitement : de quelques secondes
-          à quelques minutes.
+          La durée effective de conservation est donc celle de l'enregistrement et du traitement
+          (de quelques secondes à quelques minutes pour un fichier déposé), jamais plus de
+          quelques heures dans le cas d'un enregistrement abandonné.
         </li>
         <li>
           Les journaux techniques du serveur enregistrent le nom du fichier, sa taille, le nombre
@@ -135,8 +149,16 @@ export default function ConfidentialiteContentFr() {
       <h3>7. Cookies et traceurs</h3>
       <p>
         <strong>Le service ne dépose aucun cookie</strong>, n'utilise aucun traceur publicitaire
-        et ne réalise aucune mesure d'audience. Il n'enregistre rien dans le stockage local de
-        votre navigateur.
+        et ne réalise aucune mesure d'audience.
+      </p>
+      <p>
+        Le service utilise le stockage local de votre navigateur pour : mémoriser votre langue et
+        votre préférence de notification, suivre le traitement en cours (afin de le retrouver si
+        vous rechargez la page), et <strong>sauvegarder sur votre appareil l'audio d'un
+        enregistrement micro en cours</strong> pour pouvoir le reprendre après un incident. Cette
+        sauvegarde reste sur votre appareil ; elle est supprimée dès que le traitement démarre,
+        si vous la supprimez depuis l'accueil, et automatiquement après 24 heures. Ces données ne
+        sont pas des cookies et ne sont jamais utilisées pour vous suivre.
       </p>
       <p>
         Seul un cache technique de type « service worker » conserve les fichiers de l'interface
@@ -155,7 +177,7 @@ export default function ConfidentialiteContentFr() {
       <h3>8. Sécurité</h3>
       <ul>
         <li>Les échanges sont chiffrés de bout en bout en HTTPS.</li>
-        <li>Aucun stockage persistant du contenu, donc aucune fuite possible a posteriori.</li>
+        <li>Aucun stockage durable du contenu : tout est supprimé à la fin du traitement, donc aucune fuite possible a posteriori.</li>
         <li>Le nom du fichier déposé est assaini avant écriture sur le serveur.</li>
         <li>Les formats et la taille des fichiers acceptés sont restreints.</li>
         <li>L'absence de compte supprime tout risque lié à des identifiants compromis.</li>

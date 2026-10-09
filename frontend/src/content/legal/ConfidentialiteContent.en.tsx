@@ -95,24 +95,39 @@ export default function ConfidentialiteContentEn() {
       </p>
 
       <h3>6. Retention period</h3>
-      <p>This is the most important point about this service: it retains nothing.</p>
+      <p>
+        This is the most important point about this service: it retains no content beyond the
+        processing.
+      </p>
       <ul>
         <li>
-          The audio file is written to a temporary server directory only during processing, then{" "}
-          <strong>deleted at the end of the request</strong>, including when an error occurs
-          along the way.
+          The audio file you upload is written to a temporary server directory only during
+          processing, then <strong>deleted at the end of the processing</strong>, including when
+          an error occurs along the way.
         </li>
         <li>
-          The file is split into ten-minute segments; each segment is{" "}
+          When you record from the microphone, the audio is sent to the server{" "}
+          <strong>in segments, while you are recording</strong>, so that an incident (closed tab,
+          lost connection) does not lose the whole meeting. These segments stay in the server's
+          temporary directory during the recording and then the processing, and are{" "}
+          <strong>deleted at the end of the processing</strong> (or as soon as you abandon the
+          recording). A recording that is never finished is deleted automatically{" "}
+          <strong>after 6 hours at most</strong>.
+        </li>
+        <li>
+          For transcription, the audio is split into pieces; each piece is{" "}
           <strong>deleted immediately after it is transcribed</strong>.
         </li>
         <li>
-          The transcript and generated study sheet are processed <strong>in memory only</strong>,
-          returned to your browser, and never written to disk. The service has no database.
+          The transcribed text and generated study sheet are kept in a small temporary server
+          file until your browser retrieves them:{" "}
+          <strong>deleted as soon as it is retrieved</strong>, and at the latest 2 hours later if
+          you never retrieve it. The service has no database.
         </li>
         <li>
-          The effective retention period is therefore that of the processing itself: a few
-          seconds to a few minutes.
+          The effective retention period is therefore that of the recording and the processing (a
+          few seconds to a few minutes for an uploaded file), never more than a few hours for an
+          abandoned recording.
         </li>
         <li>
           The server's technical logs record the file name, its size, the number of segments, and
@@ -129,7 +144,15 @@ export default function ConfidentialiteContentEn() {
       <h3>7. Cookies and trackers</h3>
       <p>
         <strong>The service sets no cookies</strong>, uses no advertising tracker, and performs
-        no audience measurement. It stores nothing in your browser's local storage.
+        no audience measurement.
+      </p>
+      <p>
+        The service uses your browser's local storage to: remember your language and notification
+        preference, track the processing in progress (so it can be found again if you reload the
+        page), and <strong>save the audio of a microphone recording in progress on your
+        device</strong> so it can be resumed after an incident. This backup stays on your device;
+        it is deleted as soon as the processing starts, if you delete it from the home page, and
+        automatically after 24 hours. These are not cookies and are never used to track you.
       </p>
       <p>
         Only a technical "service worker" cache stores the interface files (code, styles, icons)
@@ -146,7 +169,7 @@ export default function ConfidentialiteContentEn() {
       <h3>8. Security</h3>
       <ul>
         <li>All exchanges are end-to-end encrypted over HTTPS.</li>
-        <li>No persistent storage of content, so no leak is possible after the fact.</li>
+        <li>No lasting storage of content: everything is deleted at the end of the processing, so no leak is possible after the fact.</li>
         <li>The uploaded file name is sanitized before being written to the server.</li>
         <li>Accepted file formats and sizes are restricted.</li>
         <li>The absence of accounts removes any risk tied to compromised credentials.</li>

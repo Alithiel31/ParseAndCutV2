@@ -10,7 +10,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.config import CORS_ORIGINS, PORT
 from app.limiter import limiter
-from app.routers import health, transcribe
+from app.routers import health, recordings, transcribe
 
 app = FastAPI()
 
@@ -27,6 +27,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(transcribe.router)
+app.include_router(recordings.router)
 
 # Le backend n'est jamais exposé directement à Internet : sur le Pi, nginx
 # (frontend/nginx.conf) reverse-proxy same-origin vers ce service via le réseau
