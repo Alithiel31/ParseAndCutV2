@@ -20,6 +20,8 @@ export interface JobProgress {
   step: TranscribeStep;
   chunkCurrent?: number;
   chunkTotal?: number;
+  summaryCurrent?: number;
+  summaryTotal?: number;
 }
 
 // URL de l'API backend (FastAPI ParseAndCutV2).
@@ -131,6 +133,8 @@ async function followTranscriptionJob(
       step: (data.step as TranscribeStep) || "whisper",
       chunkCurrent: data.chunk_current ?? undefined,
       chunkTotal: data.chunk_total ?? undefined,
+      summaryCurrent: data.summary_current ?? undefined,
+      summaryTotal: data.summary_total ?? undefined,
     });
   }
 }

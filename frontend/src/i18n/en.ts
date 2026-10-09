@@ -20,6 +20,7 @@ const en = {
   "home.status.whisper": "Whisper transcription…",
   "home.status.whisperProgress": "Whisper transcription… ({current}/{total})",
   "home.status.structuring": "AI structuring…",
+  "home.status.structuringProgress": "AI structuring… step {current}/{total}",
   "home.status.summaryDone": "✅ Study sheet generated!",
   "home.status.transcriptDone": "✅ Transcription complete!",
   "home.eyebrow": "From audio to insight",

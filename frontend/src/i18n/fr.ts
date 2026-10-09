@@ -18,6 +18,7 @@ const fr = {
   "home.status.whisper": "Transcription Whisper…",
   "home.status.whisperProgress": "Transcription Whisper… ({current}/{total})",
   "home.status.structuring": "Structuration par l'IA…",
+  "home.status.structuringProgress": "Structuration par l'IA… étape {current}/{total}",
   "home.status.summaryDone": "✅ Fiche générée !",
   "home.status.transcriptDone": "✅ Transcription terminée !",
   "home.eyebrow": "De l’audio à l’essentiel",

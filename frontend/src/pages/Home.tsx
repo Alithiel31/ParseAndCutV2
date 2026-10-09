@@ -135,7 +135,14 @@ export default function Home() {
       );
     } else if (progress.step === "llm") {
       setActiveStep("step-llm");
-      setStatusText(t("home.status.structuring"));
+      setStatusText(
+        progress.summaryTotal && progress.summaryTotal > 1
+          ? t("home.status.structuringProgress", {
+              current: progress.summaryCurrent ?? 1,
+              total: progress.summaryTotal,
+            })
+          : t("home.status.structuring")
+      );
     }
   }
 
