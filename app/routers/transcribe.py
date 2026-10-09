@@ -7,7 +7,7 @@ import tempfile
 import threading
 import time
 import uuid
-from typing import Optional
+from typing import Callable, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
@@ -78,6 +78,167 @@ def _valider_requete(lang: str, audio: Optional[UploadFile], mode: str) -> None:
         )
 
 
+class _ErreurPipeline(Exception):
+    """Échec « métier » du pipeline, déjà associé à son code HTTP et à son
+    message traduit (découpage illisible, transcription vide…)."""
+
+    def __init__(self, http_status: int, detail: str):
+        super().__init__(detail)
+        self.http_status = http_status
+        self.detail = detail
+
+
+def _traduire_erreur(exc: Exception, lang: str) -> tuple[int, str]:
+    """Convertit une exception du pipeline en (code HTTP, message traduit).
+    Partagé par la route synchrone (qui en fait une HTTPException) et par le
+    job de fond (qui l'écrit comme statut final du job)."""
+    if isinstance(exc, _ErreurPipeline):
+        return exc.http_status, exc.detail
+
+    if isinstance(exc, subprocess.TimeoutExpired):
+        logger.error("FFmpeg timeout global")
+        return 504, t("ffmpeg_timeout", lang)
+
+    if isinstance(exc, RuntimeError):
+        logger.error(f"Erreur transcription: {exc}")
+        return 502, t("transcription_error", lang, error=str(exc))
+
+    if isinstance(exc, APIError):
+        logger.error(f"Erreur API Groq: {exc}")
+        return 502, t("groq_api_error", lang, error=exc.message)
+
+    logger.error("Erreur inattendue dans le traitement", exc_info=exc)
+    return 500, t("internal_error", lang)
+
+
+def _supprimer_fichier_entree(input_path: str) -> None:
+    if os.path.exists(input_path):
+        os.remove(input_path)
+        logger.info(f"Fichier original supprimé : {input_path}")
+
+
+def _executer_pipeline(
+    input_path: str,
+    pipeline_id: str,
+    mode: str,
+    lang: str,
+    on_progress: Optional[Callable[..., None]] = None,
+    log_prefix: str = "",
+) -> dict:
+    """Pipeline complet : découpage -> transcription chunk par chunk -> résumé.
+
+    Commun à la route synchrone et au job de fond. Retourne le corps de la
+    réponse ; lève `_ErreurPipeline` (ou l'exception d'origine) en cas
+    d'échec, à charge pour l'appelant de la traduire via `_traduire_erreur`.
+    `on_progress(**champs)`, si fourni, reçoit l'étape courante (step,
+    chunk_total, chunk_current). Supprime ses propres chunks, pas `input_path`.
+    """
+    chunks_créés: list[str] = []
+    try:
+        size_mo = os.path.getsize(input_path) / 1024 / 1024
+        logger.info(f"📥 {log_prefix}Fichier reçu : {os.path.basename(input_path)} ({size_mo:.1f} Mo)")
+
+        # Mesure du temps de traitement total (hors upload) et de la durée
+        # audio réelle — sert uniquement à alimenter les stats/logs (aucun
+        # impact sur le comportement métier).
+        début_traitement = time.perf_counter()
+        durée_audio_sec = obtenir_duree_audio(input_path)
+
+        # --- 1. Découpage ---
+        logger.info(f"✂️  {log_prefix}Découpage en chunks...")
+        if on_progress:
+            on_progress(step="cutting")
+        chunks_créés = découper_audio(input_path, pipeline_id, duree_totale_sec=durée_audio_sec)
+
+        if not chunks_créés:
+            raise _ErreurPipeline(422, t("ffmpeg_unreadable", lang))
+
+        logger.info(f"✅ {log_prefix}{len(chunks_créés)} chunk(s) prêts à transcrire")
+
+        # --- 2. Transcription chunk par chunk ---
+        logger.info(f"🎙️  {log_prefix}Transcription Whisper...")
+        if on_progress:
+            on_progress(step="whisper", chunk_total=len(chunks_créés))
+        texte_complet = ""
+        segments_horodatés = []
+
+        for i, path in enumerate(chunks_créés):
+            if on_progress:
+                on_progress(chunk_current=i + 1)
+            logger.info(f"  {log_prefix}[{i+1}/{len(chunks_créés)}] {os.path.basename(path)}")
+            texte_chunk, segments = transcrire_chunk(path)
+            texte_complet += texte_chunk + " "
+
+            offset = i * CHUNK_DURATION
+            for seg in segments:
+                segments_horodatés.append({
+                    "start": seg["start"] + offset,
+                    "text": seg["text"],
+                })
+
+            os.remove(path)  # Nettoyage immédiat après transcription
+
+        if not texte_complet.strip():
+            raise _ErreurPipeline(422, t("transcription_empty", lang))
+
+        logger.info(f"✅ {log_prefix}Transcription complète : {len(texte_complet):,} caractères")
+
+        response_body = {
+            "mode": mode,
+            "stats": {
+                "chunks":               len(chunks_créés),
+                "transcription_chars":  len(texte_complet)
+            }
+        }
+
+        # --- 3. Structuration LLM (uniquement en mode résumé) ---
+        if mode == "summary":
+            logger.info(f"🧠 {log_prefix}Structuration par IA...")
+            if on_progress:
+                on_progress(step="llm")
+            completion = client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[{"role": "user", "content": construire_prompt(texte_complet, lang)}],
+                temperature=0.4,
+                max_tokens=4096
+            )
+
+            response_body["markdown"] = completion.choices[0].message.content
+            logger.info(f"✅ {log_prefix}Fiche générée avec succès")
+        else:
+            logger.info(f"⏭️  {log_prefix}Mode transcription basique — pas d'appel LLM")
+            response_body["transcript"] = "\n".join(
+                f"[{_formater_horodatage(seg['start'])}] {seg['text']}"
+                for seg in segments_horodatés
+                if seg["text"]
+            )
+
+        # --- Stats de performance (mesure uniquement, aucun impact fonctionnel) ---
+        temps_traitement_sec = time.perf_counter() - début_traitement
+        response_body["stats"]["audio_duration_sec"] = (
+            round(durée_audio_sec, 2) if durée_audio_sec is not None else None
+        )
+        response_body["stats"]["processing_time_sec"] = round(temps_traitement_sec, 2)
+
+        if durée_audio_sec:
+            ratio = durée_audio_sec / temps_traitement_sec
+            logger.info(
+                f"⏱️  {log_prefix}{_formater_horodatage(durée_audio_sec)} audio traité en "
+                f"{temps_traitement_sec:.1f}s (ratio {ratio:.0f}x)"
+            )
+        else:
+            logger.info(f"⏱️  {log_prefix}Traitement terminé en {temps_traitement_sec:.1f}s (durée audio inconnue)")
+
+        return response_body
+
+    finally:
+        # Nettoyage garanti des chunks restants, même en cas d'exception
+        for path in chunks_créés:
+            if os.path.exists(path):
+                os.remove(path)
+                logger.debug(f"Chunk supprimé : {path}")
+
+
 @router.post('/process')
 @router.post('/api/transcribe')  # alias explicite pour les clients API/PWA
 @limiter.limit(RATE_LIMIT_PROCESS)
@@ -104,264 +265,47 @@ def process(
     # seul suffisait, écraser/lire le fichier temporaire l'une de l'autre en cas
     # de nom de fichier identique — ex. deux utilisateurs uploadant "cours.mp3"
     # en même temps).
-    request_id    = uuid.uuid4().hex
-    input_path    = os.path.join(tempfile.gettempdir(), f"{request_id}_{filename}")
-    chunks_créés  = []
+    request_id = uuid.uuid4().hex
+    input_path = os.path.join(tempfile.gettempdir(), f"{request_id}_{filename}")
 
     try:
         _sauvegarder_avec_limite(audio.file, input_path, MAX_UPLOAD_SIZE_BYTES, lang)
-        size_mo = os.path.getsize(input_path) / 1024 / 1024
-        logger.info(f"📥 Fichier reçu : {filename} ({size_mo:.1f} Mo)")
+        return JSONResponse(_executer_pipeline(input_path, request_id, mode, lang))
 
-        # Mesure du temps de traitement total (hors upload) et de la durée
-        # audio réelle — sert uniquement à alimenter les stats/logs (aucun
-        # impact sur le comportement métier).
-        début_traitement = time.perf_counter()
-        durée_audio_sec = obtenir_duree_audio(input_path)
-
-        # --- 1. Découpage ---
-        logger.info("✂️  Découpage en chunks...")
-        chunks_créés = découper_audio(input_path, request_id, duree_totale_sec=durée_audio_sec)
-
-        if not chunks_créés:
-            raise HTTPException(
-                status_code=422,
-                detail=t("ffmpeg_unreadable", lang)
-            )
-
-        logger.info(f"✅ {len(chunks_créés)} chunk(s) prêts à transcrire")
-
-        # --- 2. Transcription chunk par chunk ---
-        logger.info("🎙️  Transcription Whisper...")
-        texte_complet = ""
-        segments_horodatés = []
-
-        for i, path in enumerate(chunks_créés):
-            logger.info(f"  [{i+1}/{len(chunks_créés)}] {os.path.basename(path)}")
-            texte_chunk, segments = transcrire_chunk(path)
-            texte_complet += texte_chunk + " "
-
-            offset = i * CHUNK_DURATION
-            for seg in segments:
-                segments_horodatés.append({
-                    "start": seg["start"] + offset,
-                    "text": seg["text"],
-                })
-
-            os.remove(path)  # Nettoyage immédiat après transcription
-
-        if not texte_complet.strip():
-            raise HTTPException(
-                status_code=422,
-                detail=t("transcription_empty", lang)
-            )
-
-        logger.info(f"✅ Transcription complète : {len(texte_complet):,} caractères")
-
-        response_body = {
-            "mode": mode,
-            "stats": {
-                "chunks":               len(chunks_créés),
-                "transcription_chars":  len(texte_complet)
-            }
-        }
-
-        # --- 3. Structuration LLM (uniquement en mode résumé) ---
-        if mode == "summary":
-            logger.info("🧠 Structuration par IA...")
-            completion = client.chat.completions.create(
-                model="openai/gpt-oss-120b",
-                messages=[{"role": "user", "content": construire_prompt(texte_complet, lang)}],
-                temperature=0.4,
-                max_tokens=4096
-            )
-
-            response_body["markdown"] = completion.choices[0].message.content
-            logger.info("✅ Fiche générée avec succès")
-        else:
-            logger.info("⏭️  Mode transcription basique — pas d'appel LLM")
-            response_body["transcript"] = "\n".join(
-                f"[{_formater_horodatage(seg['start'])}] {seg['text']}"
-                for seg in segments_horodatés
-                if seg["text"]
-            )
-
-        # --- Stats de performance (mesure uniquement, aucun impact fonctionnel) ---
-        temps_traitement_sec = time.perf_counter() - début_traitement
-        response_body["stats"]["audio_duration_sec"] = (
-            round(durée_audio_sec, 2) if durée_audio_sec is not None else None
-        )
-        response_body["stats"]["processing_time_sec"] = round(temps_traitement_sec, 2)
-
-        if durée_audio_sec:
-            ratio = durée_audio_sec / temps_traitement_sec
-            logger.info(
-                f"⏱️  {_formater_horodatage(durée_audio_sec)} audio traité en "
-                f"{temps_traitement_sec:.1f}s (ratio {ratio:.0f}x)"
-            )
-        else:
-            logger.info(f"⏱️  Traitement terminé en {temps_traitement_sec:.1f}s (durée audio inconnue)")
-
-        return JSONResponse(response_body)
-
-    # --- Gestion d'erreurs granulaire ---
     except HTTPException:
         raise
 
-    except subprocess.TimeoutExpired:
-        logger.error("FFmpeg timeout global")
-        raise HTTPException(status_code=504, detail=t("ffmpeg_timeout", lang))
-
-    except RuntimeError as e:
-        logger.error(f"Erreur transcription: {e}")
-        raise HTTPException(status_code=502, detail=t("transcription_error", lang, error=str(e)))
-
-    except APIError as e:
-        logger.error(f"Erreur API Groq: {e}")
-        raise HTTPException(status_code=502, detail=t("groq_api_error", lang, error=e.message))
-
-    except Exception:
-        logger.exception("Erreur inattendue dans /process")
-        raise HTTPException(status_code=500, detail=t("internal_error", lang))
+    except Exception as exc:
+        status, detail = _traduire_erreur(exc, lang)
+        raise HTTPException(status_code=status, detail=detail)
 
     finally:
-        # Nettoyage garanti même en cas d'exception à mi-parcours
-        for path in chunks_créés:
-            if os.path.exists(path):
-                os.remove(path)
-                logger.debug(f"Chunk supprimé : {path}")
-        if os.path.exists(input_path):
-            os.remove(input_path)
-            logger.info(f"Fichier original supprimé : {input_path}")
+        _supprimer_fichier_entree(input_path)
 
 
 def _traiter_job(job_id: str, input_path: str, filename: str, mode: str, lang: str) -> None:
-    """Exécute le pipeline complet (découpage -> transcription -> résumé) en
-    tâche de fond et écrit le résultat (ou l'erreur) dans le store de jobs.
+    """Exécute le pipeline en tâche de fond et écrit le résultat (ou l'erreur)
+    dans le store de jobs.
 
-    Miroir de la logique de `process()` ci-dessus, adapté pour ne jamais lever
-    d'exception HTTP : ce n'est plus une requête HTTP en cours (personne ne
-    l'attraperait), donc chaque erreur est directement écrite comme statut
-    final du job, à charge pour GET /api/transcribe/status/{job_id} de la
+    Ce n'est plus une requête HTTP en cours (personne n'attraperait une
+    HTTPException) : chaque erreur est directement écrite comme statut final
+    du job, à charge pour GET /api/transcribe/status/{job_id} de la
     retraduire en HTTPException au moment où le client la récupère.
     """
-    chunks_créés = []
     try:
-        size_mo = os.path.getsize(input_path) / 1024 / 1024
-        logger.info(f"📥 [job {job_id}] Fichier reçu : {filename} ({size_mo:.1f} Mo)")
-
-        début_traitement = time.perf_counter()
-        durée_audio_sec = obtenir_duree_audio(input_path)
-
-        # --- 1. Découpage ---
-        logger.info(f"✂️  [job {job_id}] Découpage en chunks...")
-        update_job(job_id, step="cutting")
-        chunks_créés = découper_audio(input_path, job_id, duree_totale_sec=durée_audio_sec)
-
-        if not chunks_créés:
-            update_job(job_id, status="error", http_status=422, detail=t("ffmpeg_unreadable", lang))
-            return
-
-        logger.info(f"✅ [job {job_id}] {len(chunks_créés)} chunk(s) prêts à transcrire")
-
-        # --- 2. Transcription chunk par chunk ---
-        logger.info(f"🎙️  [job {job_id}] Transcription Whisper...")
-        update_job(job_id, step="whisper", chunk_total=len(chunks_créés))
-        texte_complet = ""
-        segments_horodatés = []
-
-        for i, path in enumerate(chunks_créés):
-            update_job(job_id, chunk_current=i + 1)
-            logger.info(f"  [job {job_id}] [{i+1}/{len(chunks_créés)}] {os.path.basename(path)}")
-            texte_chunk, segments = transcrire_chunk(path)
-            texte_complet += texte_chunk + " "
-
-            offset = i * CHUNK_DURATION
-            for seg in segments:
-                segments_horodatés.append({
-                    "start": seg["start"] + offset,
-                    "text": seg["text"],
-                })
-
-            os.remove(path)  # Nettoyage immédiat après transcription
-
-        if not texte_complet.strip():
-            update_job(job_id, status="error", http_status=422, detail=t("transcription_empty", lang))
-            return
-
-        logger.info(f"✅ [job {job_id}] Transcription complète : {len(texte_complet):,} caractères")
-
-        response_body = {
-            "mode": mode,
-            "stats": {
-                "chunks":               len(chunks_créés),
-                "transcription_chars":  len(texte_complet)
-            }
-        }
-
-        # --- 3. Structuration LLM (uniquement en mode résumé) ---
-        if mode == "summary":
-            logger.info(f"🧠 [job {job_id}] Structuration par IA...")
-            update_job(job_id, step="llm")
-            completion = client.chat.completions.create(
-                model="openai/gpt-oss-120b",
-                messages=[{"role": "user", "content": construire_prompt(texte_complet, lang)}],
-                temperature=0.4,
-                max_tokens=4096
-            )
-
-            response_body["markdown"] = completion.choices[0].message.content
-            logger.info(f"✅ [job {job_id}] Fiche générée avec succès")
-        else:
-            logger.info(f"⏭️  [job {job_id}] Mode transcription basique — pas d'appel LLM")
-            response_body["transcript"] = "\n".join(
-                f"[{_formater_horodatage(seg['start'])}] {seg['text']}"
-                for seg in segments_horodatés
-                if seg["text"]
-            )
-
-        # --- Stats de performance (mesure uniquement, aucun impact fonctionnel) ---
-        temps_traitement_sec = time.perf_counter() - début_traitement
-        response_body["stats"]["audio_duration_sec"] = (
-            round(durée_audio_sec, 2) if durée_audio_sec is not None else None
+        résultat = _executer_pipeline(
+            input_path, job_id, mode, lang,
+            on_progress=lambda **champs: update_job(job_id, **champs),
+            log_prefix=f"[job {job_id}] ",
         )
-        response_body["stats"]["processing_time_sec"] = round(temps_traitement_sec, 2)
+        update_job(job_id, status="done", result=résultat)
 
-        if durée_audio_sec:
-            ratio = durée_audio_sec / temps_traitement_sec
-            logger.info(
-                f"⏱️  [job {job_id}] {_formater_horodatage(durée_audio_sec)} audio traité en "
-                f"{temps_traitement_sec:.1f}s (ratio {ratio:.0f}x)"
-            )
-        else:
-            logger.info(f"⏱️  [job {job_id}] Traitement terminé en {temps_traitement_sec:.1f}s (durée audio inconnue)")
-
-        update_job(job_id, status="done", result=response_body)
-
-    except subprocess.TimeoutExpired:
-        logger.error(f"FFmpeg timeout global [job {job_id}]")
-        update_job(job_id, status="error", http_status=504, detail=t("ffmpeg_timeout", lang))
-
-    except RuntimeError as e:
-        logger.error(f"Erreur transcription [job {job_id}]: {e}")
-        update_job(job_id, status="error", http_status=502, detail=t("transcription_error", lang, error=str(e)))
-
-    except APIError as e:
-        logger.error(f"Erreur API Groq [job {job_id}]: {e}")
-        update_job(job_id, status="error", http_status=502, detail=t("groq_api_error", lang, error=e.message))
-
-    except Exception:
-        logger.exception(f"Erreur inattendue dans le traitement du job {job_id}")
-        update_job(job_id, status="error", http_status=500, detail=t("internal_error", lang))
+    except Exception as exc:
+        status, detail = _traduire_erreur(exc, lang)
+        update_job(job_id, status="error", http_status=status, detail=detail)
 
     finally:
-        for path in chunks_créés:
-            if os.path.exists(path):
-                os.remove(path)
-                logger.debug(f"Chunk supprimé : {path}")
-        if os.path.exists(input_path):
-            os.remove(input_path)
-            logger.info(f"Fichier original supprimé : {input_path}")
+        _supprimer_fichier_entree(input_path)
 
 
 @router.post('/api/transcribe/start')
