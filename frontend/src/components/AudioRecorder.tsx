@@ -37,12 +37,14 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
   const [recordedFile, setRecordedFile] = useState<File | null>(null);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [micMuted, setMicMuted] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const bytesRef = useRef(0);
   const sizeExceededRef = useRef(false);
   const recorderFailedRef = useRef(false);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -63,9 +65,47 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
 
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
+    void releaseWakeLock();
   }, []);
 
+  // Android coupe le micro quand l'écran s'éteint : on garde l'écran allumé
+  // pendant l'enregistrement. Le verrou est relâché par le navigateur dès que
+  // l'onglet passe en arrière-plan, d'où la reprise au retour de visibilité.
+  async function acquireWakeLock() {
+    if (!("wakeLock" in navigator) || wakeLockRef.current) return;
+    try {
+      const sentinel = await navigator.wakeLock.request("screen");
+      sentinel.addEventListener("release", () => {
+        if (wakeLockRef.current === sentinel) wakeLockRef.current = null;
+      });
+      wakeLockRef.current = sentinel;
+    } catch {
+      // Refusé (économiseur de batterie, navigateur non compatible) : non bloquant.
+    }
+  }
+
+  async function releaseWakeLock() {
+    const sentinel = wakeLockRef.current;
+    wakeLockRef.current = null;
+    try {
+      await sentinel?.release();
+    } catch {
+      // Déjà relâché.
+    }
+  }
+
+  useEffect(() => {
+    if (phase !== "recording" && phase !== "paused") return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void acquireWakeLock();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [phase]);
+
   function closeStream() {
+    void releaseWakeLock();
+    setMicMuted(false);
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     recorderRef.current = null;
@@ -98,6 +138,10 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+      stream.getAudioTracks().forEach((track) => {
+        track.onmute = () => setMicMuted(true);
+        track.onunmute = () => setMicMuted(false);
+      });
       const mimeType = MIME_CANDIDATES.find((candidate) => MediaRecorder.isTypeSupported(candidate));
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       recorderRef.current = recorder;
@@ -149,6 +193,7 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
       };
 
       recorder.start(1000);
+      void acquireWakeLock();
       onRecordingStart();
       setPhase("recording");
       setAnnouncement(t("recorder.status.recording"));
@@ -219,6 +264,8 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
         </div>
       )}
 
+      {busy && !micMuted && <p className="recorder-hint">{t("recorder.hint.keepAwake")}</p>}
+      {micMuted && busy && <p className="recorder-error" role="alert">{t("recorder.warning.micMuted")}</p>}
       {error && <p className="recorder-error" role="alert">{error}</p>}
 
       {phase === "ready" && recordedUrl && (

@@ -448,6 +448,13 @@ header p {
 .recording-preview audio { display: block; width: 100%; height: 42px; }
 .recording-preview .btn-recorder { margin-top: var(--space-3); }
 
+.recorder-hint {
+  margin: 0 0 var(--space-3);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+}
+
 .recorder-error {
   margin: var(--space-4) 0 0;
   padding: var(--space-3);

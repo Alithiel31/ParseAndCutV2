@@ -68,6 +68,8 @@ const en = {
   "recorder.error.tooLarge": "The {maxMb} MB limit was reached. Stop and use a shorter recording.",
   "recorder.error.empty": "No audio was recorded. Check your microphone and try again.",
   "recorder.status.recording": "Recording started.",
+  "recorder.hint.keepAwake": "Keep this screen on and the tab in the foreground while recording.",
+  "recorder.warning.micMuted": "The microphone is muted: the browser is no longer capturing sound (screen locked, switched apps?). Come back to this screen — this part is not being recorded.",
   "recorder.status.paused": "Recording paused.",
   "recorder.status.stopping": "Finalizing recording.",
   "recorder.status.ready": "Recording is ready to review and transcribe.",
