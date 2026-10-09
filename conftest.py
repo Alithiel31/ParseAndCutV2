@@ -9,6 +9,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # spécifiques à la machine, etc.). On coupe le load_dotenv() de
 # app/config.py en simulant un environnement "prod" avant l'import.
 os.environ.setdefault("RAILWAY_ENVIRONMENT", "test")
+# La transcription anticipée des segments lance des threads qui feraient varier l'ordre des appels
+# simulés dans les tests existants : désactivée par défaut, activée explicitement par ceux qui la testent.
+os.environ.setdefault("RECORDING_EARLY_TRANSCRIPTION", "0")
 
 import pytest  # noqa: E402
 

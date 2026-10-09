@@ -107,6 +107,7 @@ Nginx (frontend container) serves the PWA static files and reverse-proxies `/api
 | `RATE_LIMIT_PROCESS` | ❌ | `5/minute` | Rate limit on `/api/transcribe/start` and on creating/finishing a segmented recording (per IP), format `N/period` |
 | `RATE_LIMIT_SEGMENTS` | ❌ | `60/minute` | Rate limit on segment uploads of a segmented recording (per IP, shared by all segments) |
 | `RECORDING_SEGMENT_SEC` | ❌ | `300` | Length of one recording segment, announced to the browser |
+| `RECORDING_EARLY_TRANSCRIPTION` | ❌ | `1` | Transcribe each segment as soon as it arrives, while the meeting is still running (`0` to process everything at the end) |
 | `MAX_SEGMENT_SIZE_MB` | ❌ | `50` | Max size of one uploaded segment |
 | `MAX_RECORDING_SIZE_MB` | ❌ | `300` | Max cumulated size of all segments of one recording |
 | `MAX_SEGMENTS` | ❌ | `500` | Max number of segments in one recording |

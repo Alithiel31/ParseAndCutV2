@@ -41,6 +41,11 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Thi
   the server, processing starts without re-uploading the file; if the backup is unavailable or
   incomplete, the full recording is uploaded as before, so nothing depends on it. The next segment
   is started before the previous one is stopped, so there is no gap at segment boundaries
+- Segments of a recording are transcribed as soon as they reach the server, while the meeting is
+  still running (`RECORDING_EARLY_TRANSCRIPTION`, on by default): when the recording ends, only the
+  last segment and the summary remain to be processed. A segment sent again invalidates its earlier
+  result; a failed early transcription is simply redone at the end; the end waits for a transcription
+  still in progress instead of repeating it. At most 2 early transcriptions run at once per process
 - Interrupted recordings can be resumed: the audio recorded so far (finished segments plus
   one-second pieces of the segment in progress) is saved on the device in IndexedDB. After a tab
   crash, a reload or leaving the page, the home page offers to resume and process it (all segments

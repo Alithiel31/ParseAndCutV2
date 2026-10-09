@@ -6,6 +6,7 @@ segments manquants, et pipeline de bout en bout sur de vrais segments webm.
 import io
 import shutil
 import subprocess
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -307,3 +308,193 @@ class TestPipelineDeBoutEnBout:
         resp = _attendre_fin_job(client_app, start.json()["job_id"], timeout=30)
 
         assert resp.status_code == 422
+
+
+def _webm_silencieux(chemin, secondes):
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"anullsrc=r=16000:cl=mono:d={secondes}",
+         "-c:a", "libopus", str(chemin)],
+        check=True,
+    )
+    return chemin.read_bytes()
+
+
+def _attendre(condition, timeout=20.0):
+    fin = time.monotonic() + timeout
+    while time.monotonic() < fin:
+        if condition():
+            return True
+        time.sleep(0.05)
+    return False
+
+
+class TestSignatureDesResultatsAnticipes:
+    """Un résultat de transcription anticipée ne doit jamais être réutilisé pour un segment
+    dont le contenu a changé depuis."""
+
+    def _segment(self, contenu=b"v1"):
+        rec = recordings.creer_enregistrement()
+        recordings.enregistrer_segment(rec, 0, "webm", io.BytesIO(contenu), 1000, 10_000)
+        return rec
+
+    def test_aller_retour(self):
+        rec = self._segment()
+        recordings.sauver_resultat(rec, 0, {"texte": "a"}, recordings.signature_segment(rec, 0))
+        assert recordings.lire_resultat(rec, 0)["texte"] == "a"
+
+    def test_resultat_perime_apres_renvoi_du_segment(self):
+        rec = self._segment(b"version 1")
+        ancienne = recordings.signature_segment(rec, 0)
+        recordings.enregistrer_segment(rec, 0, "webm", io.BytesIO(b"version 2, differente"), 1000, 10_000)
+
+        # La tâche de fond de l'ancienne version finit APRÈS le renvoi et écrit son résultat :
+        # il porte l'ancienne signature, donc il est rejeté.
+        recordings.sauver_resultat(rec, 0, {"texte": "périmé"}, ancienne)
+
+        assert recordings.lire_resultat(rec, 0) is None
+
+    def test_le_renvoi_efface_le_resultat_existant(self):
+        rec = self._segment(b"version 1")
+        recordings.sauver_resultat(rec, 0, {"texte": "a"}, recordings.signature_segment(rec, 0))
+        recordings.enregistrer_segment(rec, 0, "webm", io.BytesIO(b"autre"), 1000, 10_000)
+        assert recordings.lire_resultat(rec, 0) is None
+
+    def test_attente_des_transcriptions_en_cours(self):
+        rec = self._segment()
+        recordings.marquer_en_cours(rec, 0)
+        assert recordings.attendre_en_cours(rec, 0.3) is False  # délai dépassé, marqueur toujours là
+        recordings.fin_en_cours(rec, 0)
+        assert recordings.attendre_en_cours(rec, 0.3) is True
+
+    def test_marqueur_abandonne_n_est_plus_attendu(self, monkeypatch):
+        rec = self._segment()
+        recordings.marquer_en_cours(rec, 0)
+        monkeypatch.setattr(recordings, "WORKING_STALE_SEC", -1)  # tout marqueur est « mort »
+        assert recordings.attendre_en_cours(rec, 5) is True
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="FFmpeg indisponible")
+class TestTranscriptionAnticipee:
+    """Les segments sont transcrits dès leur arrivée ; la fin de l'enregistrement réutilise ces
+    résultats au lieu de tout retranscrire. Whisper est simulé, ffmpeg est réel."""
+
+    @pytest.fixture(autouse=True)
+    def configuration(self, monkeypatch):
+        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(recordings_router, "RECORDING_EARLY_TRANSCRIPTION", True)
+
+    @pytest.fixture
+    def whisper(self, monkeypatch):
+        appels = []
+
+        def _transcrire(path, retries=5):
+            appels.append(path)
+            return "Mot. ", [{"start": 1.0, "end": 2.0, "text": f"Segment {len(appels)}"}]
+
+        monkeypatch.setattr(transcribe, "transcrire_chunk", _transcrire)
+        return appels
+
+    def _envoyer(self, client_app, rec, tmp_path, durees):
+        for i, duree in enumerate(durees):
+            contenu = _webm(tmp_path / f"e{i}.webm", duree, 440 + 100 * i)
+            resp = client_app.post(f"/api/recordings/{rec}/segments/{i}", files=_segment(contenu, f"segment-{i}.webm"))
+            assert resp.status_code == 200
+
+    def test_transcrit_des_la_reception_puis_reutilise_a_la_fin(self, client_app, whisper, tmp_path):
+        rec = _creer(client_app)
+        self._envoyer(client_app, rec, tmp_path, [3, 5])
+
+        # Avant même « Terminer » : les deux segments ont déjà leur transcription.
+        assert _attendre(lambda: all(recordings.lire_resultat(rec, i) for i in (0, 1)))
+        assert len(whisper) == 2
+
+        start = client_app.post(f"/api/recordings/{rec}/finish", data={"mode": "transcript"})
+        resp = _attendre_fin_job(client_app, start.json()["job_id"], timeout=30)
+
+        assert resp.status_code == 200
+        assert len(whisper) == 2, "la fin a retranscrit des segments déjà transcrits"
+        lignes = resp.json()["transcript"].splitlines()
+        assert lignes[0] == "[00:01] Segment 1"
+        # Le décalage du 2e segment vient de la durée réelle du 1er (≈ 3 s), mesurée à l'avance.
+        assert lignes[1] in ("[00:04] Segment 2", "[00:05] Segment 2")
+        assert resp.json()["stats"]["chunks"] == 2
+
+    def test_la_fin_attend_une_transcription_encore_en_cours(self, client_app, monkeypatch, tmp_path):
+        appels = []
+
+        def _lente(path, retries=5):
+            appels.append(path)
+            time.sleep(1.0)
+            return "Mot. ", [{"start": 0.0, "end": 1.0, "text": "Lent"}]
+
+        monkeypatch.setattr(transcribe, "transcrire_chunk", _lente)
+        rec = _creer(client_app)
+        self._envoyer(client_app, rec, tmp_path, [2])
+
+        # « Terminer » juste après le dernier segment : sa transcription anticipée est en cours.
+        start = client_app.post(f"/api/recordings/{rec}/finish", data={"mode": "transcript"})
+        resp = _attendre_fin_job(client_app, start.json()["job_id"], timeout=30)
+
+        assert resp.status_code == 200
+        assert len(appels) == 1, "le dernier segment a été transcrit deux fois"
+        assert resp.json()["transcript"] == "[00:00] Lent"
+
+    def test_un_echec_anticipe_n_empeche_pas_la_fin(self, client_app, monkeypatch, tmp_path):
+        appels = []
+
+        def _capricieuse(path, retries=5):
+            appels.append(path)
+            if len(appels) == 1:
+                raise RuntimeError("quota épuisé pendant la réunion")
+            return "Mot. ", [{"start": 0.0, "end": 1.0, "text": "Rattrapé"}]
+
+        monkeypatch.setattr(transcribe, "transcrire_chunk", _capricieuse)
+        rec = _creer(client_app)
+        self._envoyer(client_app, rec, tmp_path, [2])
+        assert _attendre(lambda: len(appels) == 1)
+        assert _attendre(lambda: recordings.attendre_en_cours(rec, 0.01))  # tâche terminée
+        assert recordings.lire_resultat(rec, 0) is None  # rien n'a été enregistré
+
+        start = client_app.post(f"/api/recordings/{rec}/finish", data={"mode": "transcript"})
+        resp = _attendre_fin_job(client_app, start.json()["job_id"], timeout=30)
+
+        assert resp.status_code == 200
+        assert resp.json()["transcript"] == "[00:00] Rattrapé"
+        assert len(appels) == 2
+
+    def test_segment_silencieux_compte_comme_tel(self, client_app, whisper, tmp_path):
+        rec = _creer(client_app)
+        self._envoyer(client_app, rec, tmp_path, [2])
+        silencieux = _webm_silencieux(tmp_path / "vide.webm", 2)
+        client_app.post(f"/api/recordings/{rec}/segments/1", files=_segment(silencieux, "segment-1.webm"))
+        assert _attendre(lambda: all(recordings.lire_resultat(rec, i) for i in (0, 1)))
+        assert len(whisper) == 1, "le segment silencieux ne doit pas coûter d'appel Whisper"
+
+        start = client_app.post(f"/api/recordings/{rec}/finish", data={"mode": "transcript"})
+        resp = _attendre_fin_job(client_app, start.json()["job_id"], timeout=30)
+
+        assert resp.status_code == 200
+        assert resp.json()["stats"]["silent_chunks"] == 1
+        assert len(whisper) == 1
+
+    def test_desactivee_tout_est_traite_a_la_fin(self, client_app, whisper, monkeypatch, tmp_path):
+        monkeypatch.setattr(recordings_router, "RECORDING_EARLY_TRANSCRIPTION", False)
+        rec = _creer(client_app)
+        self._envoyer(client_app, rec, tmp_path, [2, 2])
+        time.sleep(0.5)
+        assert whisper == []
+        assert recordings.lire_resultat(rec, 0) is None
+
+        start = client_app.post(f"/api/recordings/{rec}/finish", data={"mode": "transcript"})
+        resp = _attendre_fin_job(client_app, start.json()["job_id"], timeout=30)
+
+        assert resp.status_code == 200
+        assert len(whisper) == 2
+
+    def test_sans_groq_aucune_tache_n_est_lancee(self, client_app, whisper, monkeypatch, tmp_path):
+        rec = _creer(client_app)
+        monkeypatch.setattr(transcribe, "client", None)
+        contenu = _webm(tmp_path / "x.webm", 2, 440)
+        client_app.post(f"/api/recordings/{rec}/segments/0", files=_segment(contenu, "segment-0.webm"))
+        time.sleep(0.3)
+        assert whisper == []

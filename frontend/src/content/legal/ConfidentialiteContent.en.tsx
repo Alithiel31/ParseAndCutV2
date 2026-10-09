@@ -111,7 +111,8 @@ export default function ConfidentialiteContentEn() {
           lost connection) does not lose the whole meeting. These segments stay in the server's
           temporary directory during the recording and then the processing, and are{" "}
           <strong>deleted at the end of the processing</strong> (or as soon as you abandon the
-          recording). A recording that is never finished is deleted automatically{" "}
+          recording). Each segment is transcribed as soon as it arrives; the resulting text is kept
+          in the same place until the end of the processing and deleted together with the segments. A recording that is never finished is deleted automatically{" "}
           <strong>after 6 hours at most</strong>.
         </li>
         <li>

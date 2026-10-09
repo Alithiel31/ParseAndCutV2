@@ -25,6 +25,7 @@ RATE_LIMIT_PROCESS=5/minute
 # Enregistrement par segments (le navigateur envoie l'audio au fil de la réunion)
 # RATE_LIMIT_SEGMENTS=60/minute
 # RECORDING_SEGMENT_SEC=300
+# RECORDING_EARLY_TRANSCRIPTION=1
 # MAX_SEGMENT_SIZE_MB=50
 # MAX_RECORDING_SIZE_MB=300
 # MAX_SEGMENTS=500
