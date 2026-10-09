@@ -73,20 +73,27 @@ def _formater_transcript(segments: list[dict]) -> str:
     )
 
 
-def _valider_requete(lang: str, audio: Optional[UploadFile], mode: str) -> None:
-    """Valide lang/client/audio/mode de la requête de démarrage. Lève
-    HTTPException sinon."""
+MODES = ("summary", "transcript")
+
+
+def valider_lang_et_mode(lang: str, mode: str) -> None:
+    """Valide lang/client/mode d'une requête qui lance un traitement (fichier
+    complet ou fin d'enregistrement). Lève HTTPException sinon."""
     if lang not in SUPPORTED_LANGS:
         raise HTTPException(status_code=400, detail=t("invalid_lang", lang))
 
     if not client:
         raise HTTPException(status_code=503, detail=t("groq_not_configured", lang))
 
+    if mode not in MODES:
+        raise HTTPException(status_code=400, detail=t("invalid_mode", lang))
+
+
+def valider_fichier_audio(audio: Optional[UploadFile], lang: str) -> None:
+    """Vérifie qu'un fichier audio est présent et que son extension est
+    acceptée. Lève HTTPException sinon."""
     if audio is None or not audio.filename:
         raise HTTPException(status_code=400, detail=t("no_audio_file", lang))
-
-    if mode not in ("summary", "transcript"):
-        raise HTTPException(status_code=400, detail=t("invalid_mode", lang))
 
     if not allowed_file(audio.filename):
         raise HTTPException(
@@ -485,7 +492,8 @@ def transcribe_start(
     cette fenêtre et Cloudflare coupe la connexion (524) avant que le Pi ait
     fini de répondre — même si le traitement backend aurait fini par aboutir.
     """
-    _valider_requete(lang, audio, mode)
+    valider_lang_et_mode(lang, mode)
+    valider_fichier_audio(audio, lang)
 
     filename = secure_filename(audio.filename)
     if not filename:

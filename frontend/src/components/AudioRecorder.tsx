@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { extensionForMimeType } from "../audioUtils";
 import { useLanguage, useTranslation } from "../i18n";
 import { SegmentedRecording, type RecordedUpload, type SegmentSyncStatus } from "../segmentedRecording";
 
@@ -22,14 +23,6 @@ function formatTime(milliseconds: number): string {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
-}
-
-function extensionForMimeType(mimeType: string): string {
-  if (mimeType.includes("mp4")) return "mp4";
-  if (mimeType.includes("ogg")) return "ogg";
-  if (mimeType.includes("wav")) return "wav";
-  if (mimeType.includes("mpeg")) return "mp3";
-  return "webm";
 }
 
 export default function AudioRecorder({ disabled, onActivityChange, onRecordingStart, onFileReady }: AudioRecorderProps) {
