@@ -1,15 +1,7 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-
-export type Lang = "fr" | "en";
+import { useEffect, useState, type ReactNode } from "react";
+import { LanguageContext, type Lang } from "./context";
 
 const STORAGE_KEY = "pac_lang";
-
-interface LanguageContextValue {
-  lang: Lang;
-  setLang: (lang: Lang) => void;
-}
-
-const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 function detectInitialLang(): Lang {
   try {
@@ -34,10 +26,4 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [lang]);
 
   return <LanguageContext.Provider value={{ lang, setLang }}>{children}</LanguageContext.Provider>;
-}
-
-export function useLanguage(): LanguageContextValue {
-  const ctx = useContext(LanguageContext);
-  if (!ctx) throw new Error("useLanguage() doit être utilisé sous <LanguageProvider>");
-  return ctx;
 }

@@ -1,17 +1,6 @@
-import { useTranslation, type TranslationKey } from "../i18n";
+import { useTranslation } from "../i18n";
+import { STEPS } from "../steps";
 import type { TranscribeMode } from "../api";
-
-export interface Step {
-  id: string;
-  labelKey: TranslationKey;
-}
-
-export const STEPS: Step[] = [
-  { id: "step-upload", labelKey: "steps.step-upload" },
-  { id: "step-cut", labelKey: "steps.step-cut" },
-  { id: "step-whisper", labelKey: "steps.step-whisper" },
-  { id: "step-llm", labelKey: "steps.step-llm" },
-];
 
 interface ProgressStepsProps {
   activeId: string;

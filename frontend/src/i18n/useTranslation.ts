@@ -1,6 +1,6 @@
 import fr from "./fr";
 import en from "./en";
-import { useLanguage } from "./LanguageContext";
+import { useLanguage } from "./context";
 
 export type TranslationKey = keyof typeof fr;
 type Params = Record<string, string | number>;
