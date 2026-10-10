@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, resumeTranscription, type JobProgress, type TranscribeMode, type TranscribeResult } from "../api";
-import { STEPS } from "../components/ProgressSteps";
+import { STEPS } from "../steps";
 import { useTranslation } from "../i18n";
 import { getPermission, notifyResult } from "../notifications";
 import { clearPendingJob, readPendingJob } from "../pendingJob";

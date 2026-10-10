@@ -43,18 +43,19 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
   const recorderFailedRef = useRef(false);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const segmentsRef = useRef<SegmentedRecording | null>(null);
+  const recordedUrlRef = useRef<string | null>(null);
   const { t } = useTranslation();
   const { lang } = useLanguage();
 
-  useEffect(() => {
-    if (!recordedFile) {
-      setRecordedUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(recordedFile);
+  // Fichier enregistré et son URL de lecture, créée et libérée avec lui (pas dans un effet :
+  // l'URL serait un état dérivé, recalculé après coup).
+  function showRecordedFile(file: File | null) {
+    if (recordedUrlRef.current) URL.revokeObjectURL(recordedUrlRef.current);
+    const url = file ? URL.createObjectURL(file) : null;
+    recordedUrlRef.current = url;
+    setRecordedFile(file);
     setRecordedUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [recordedFile]);
+  }
 
   useEffect(() => {
     if (phase !== "recording") return;
@@ -67,6 +68,7 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
     // Page quittée en pleine réunion : l'audio déjà enregistré reste sur l'appareil et
     // sera proposé à la reprise au prochain affichage.
     segmentsRef.current?.detach();
+    if (recordedUrlRef.current) URL.revokeObjectURL(recordedUrlRef.current);
     void releaseWakeLock();
   }, []);
 
@@ -157,7 +159,7 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
       recorderFailedRef.current = false;
       setElapsedMs(0);
       setRecordedBytes(0);
-      setRecordedFile(null);
+      showRecordedFile(null);
 
       recorder.ondataavailable = (event) => {
         if (event.data.size === 0) return;
@@ -207,7 +209,7 @@ export default function AudioRecorder({ disabled, onActivityChange, onRecordingS
 
         const mimeType = blob.type || "audio/webm";
         const file = new File([blob], `enregistrement-audio.${extensionForMimeType(mimeType)}`, { type: mimeType });
-        setRecordedFile(file);
+        showRecordedFile(file);
         onFileReady(file, upload ?? undefined);
         setPhase("ready");
         setAnnouncement(t("recorder.status.ready"));
