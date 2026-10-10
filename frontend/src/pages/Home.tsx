@@ -39,15 +39,16 @@ export default function Home() {
     }
   }, [phase]);
 
-  // Un autre fichier (ou un nouvel enregistrement) remplace celui-ci : ses copies ne serviront plus.
-  useEffect(() => {
-    if (recordingUpload && recordingUpload.file !== file) {
-      const { recordingId, localId } = recordingUpload.upload;
-      if (recordingId) void cancelRecording(recordingId, lang);
-      void forgetLocalRecording(localId);
-      setRecordingUpload(null);
-    }
-  }, [file, recordingUpload, lang]);
+  // Un autre fichier (ou un nouvel enregistrement) remplace l'enregistrement courant : ses copies ne
+  // serviront plus. Appelé depuis les handlers qui changent de fichier, pas depuis onFileReady : celui-ci
+  // vient du MediaRecorder et voit l'état du début de l'enregistrement, déjà nettoyé par onRecordingStart.
+  function discardRecordingUpload() {
+    if (!recordingUpload) return;
+    const { recordingId, localId } = recordingUpload.upload;
+    if (recordingId) void cancelRecording(recordingId, lang);
+    void forgetLocalRecording(localId);
+    setRecordingUpload(null);
+  }
 
   // Au chargement : un enregistrement interrompu (onglet planté, page quittée…) est-il resté sur l'appareil ?
   useEffect(() => {
@@ -138,6 +139,7 @@ export default function Home() {
         <DropZone
           disabled={controlsDisabled}
           onFileSelected={(f) => {
+            discardRecordingUpload();
             setFile(f);
             setError(null);
           }}
@@ -164,6 +166,7 @@ export default function Home() {
           disabled={loading}
           onActivityChange={setRecorderBusy}
           onRecordingStart={() => {
+            discardRecordingUpload();
             setFile(null);
             setError(null);
           }}
