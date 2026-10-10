@@ -9,6 +9,7 @@ import {
   type TranscribeMode,
   type TranscribeResult,
 } from "./api";
+import { segmentFilename, sleep } from "./audioUtils";
 import { translate, type Lang } from "./i18n";
 import * as store from "./recordingStore";
 
@@ -90,24 +91,16 @@ export async function findInterruptedRecordings(): Promise<InterruptedRecording[
   return found.sort((a, b) => b.session.startedAt - a.session.startedAt);
 }
 
-function extensionFor(mimeType: string): string {
-  if (mimeType.includes("mp4")) return "mp4";
-  if (mimeType.includes("ogg")) return "ogg";
-  return "webm";
-}
-
-const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
-
 async function uploadWithRetry(
   recordingId: string,
   position: number,
   blob: Blob,
-  extension: string,
+  mimeType: string,
   lang: Lang
 ): Promise<void> {
   for (let attempt = 1; ; attempt++) {
     try {
-      await uploadSegment(recordingId, position, blob, `segment-${String(position).padStart(4, "0")}.${extension}`, lang);
+      await uploadSegment(recordingId, position, blob, segmentFilename(position, mimeType), lang);
       return;
     } catch (error) {
       const retryable = error instanceof SegmentUploadError && error.retryable;
@@ -141,12 +134,11 @@ export async function processInterrupted(
   if (pieces.length === 0) throw new ApiError(translate(lang, "recovery.error.empty"));
 
   const recording = await createRecording(lang);
-  const extension = extensionFor(session.mimeType);
   try {
     // Numérotation recontinuée à partir de 0 : le serveur exige une suite sans trou.
     for (const [position, piece] of pieces.entries()) {
       options.onUploadProgress(position, pieces.length);
-      await uploadWithRetry(recording.recordingId, position, piece.blob, extension, lang);
+      await uploadWithRetry(recording.recordingId, position, piece.blob, session.mimeType, lang);
     }
     options.onUploadProgress(pieces.length, pieces.length);
   } catch (error) {

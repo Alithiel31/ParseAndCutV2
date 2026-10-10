@@ -94,16 +94,27 @@ export async function transcribeAudio(
   formData.append("mode", mode);
   formData.append("lang", lang);
 
-  const startResponse = await fetch(`${API_URL}/api/transcribe/start`, {
+  return startAndFollowJob("/api/transcribe/start", formData, lang, onProgress, onJobStarted);
+}
+
+// Démarre un job de traitement (POST qui renvoie `job_id`) puis le suit jusqu'au résultat.
+async function startAndFollowJob(
+  path: string,
+  formData: FormData,
+  lang: Lang,
+  onProgress?: (progress: JobProgress) => void,
+  onJobStarted?: (jobId: string) => void
+): Promise<TranscribeResult> {
+  const response = await fetch(`${API_URL}${path}`, {
     method: "POST",
     body: formData,
   });
 
-  if (!startResponse.ok) {
-    await lireErreur(startResponse, lang);
+  if (!response.ok) {
+    await lireErreur(response, lang);
   }
 
-  const { job_id: jobId } = (await startResponse.json()) as { job_id: string };
+  const { job_id: jobId } = (await response.json()) as { job_id: string };
   onJobStarted?.(jobId);
 
   return followTranscriptionJob(jobId, lang, onProgress);
@@ -176,19 +187,7 @@ export async function transcribeRecording(
   formData.append("mode", mode);
   formData.append("lang", lang);
 
-  const finishResponse = await fetch(`${API_URL}/api/recordings/${recordingId}/finish`, {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!finishResponse.ok) {
-    await lireErreur(finishResponse, lang);
-  }
-
-  const { job_id: jobId } = (await finishResponse.json()) as { job_id: string };
-  onJobStarted?.(jobId);
-
-  return followTranscriptionJob(jobId, lang, onProgress);
+  return startAndFollowJob(`/api/recordings/${recordingId}/finish`, formData, lang, onProgress, onJobStarted);
 }
 
 export async function resumeTranscription(

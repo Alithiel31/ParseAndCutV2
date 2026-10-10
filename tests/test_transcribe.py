@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-import app.routers.transcribe as transcribe
+import app.services.pipeline as pipeline
 from app.main import app
 from test_transcribe_async import _attendre_fin_job
 
@@ -38,7 +38,7 @@ class TestValidationRequete:
     def test_sans_fichier(self, client_app, monkeypatch):
         # Le client Groq doit être "prêt" pour dépasser la vérification 503
         # et atteindre la vérification de présence du fichier.
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         resp = _soumettre(client_app)
         assert resp.status_code == 400
@@ -46,35 +46,35 @@ class TestValidationRequete:
     def test_extension_refusee(self, client_app, monkeypatch):
         # Le client Groq doit être "prêt" pour dépasser la vérification 503
         # et atteindre la vérification d'extension.
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("notes.txt", b"pas de l'audio", "text/plain")}
         resp = _soumettre(client_app, files=files)
         assert resp.status_code == 415
 
     def test_groq_non_configure(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", None)
+        monkeypatch.setattr(pipeline, "client", None)
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = _soumettre(client_app, files=files)
         assert resp.status_code == 503
 
     def test_langue_invalide(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = _soumettre(client_app, files=files, data={"lang": "de"})
         assert resp.status_code == 400
 
     def test_message_erreur_traduit_en_anglais(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         resp = _soumettre(client_app, data={"lang": "en"})
         assert resp.status_code == 400
         assert resp.json()["detail"] == "No audio file received"
 
     def test_message_erreur_par_defaut_en_francais(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         resp = _soumettre(client_app)
         assert resp.status_code == 400
@@ -91,10 +91,10 @@ class TestPipelineFlow:
         fake_chunk.write_bytes(b"faux audio")
 
         monkeypatch.setattr(
-            transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
+            pipeline, "découper_audio", lambda *a, **k: [str(fake_chunk)]
         )
         monkeypatch.setattr(
-            transcribe,
+            pipeline,
             "transcrire_chunk",
             lambda path, retries=2: (
                 "Texte transcrit. ",
@@ -106,7 +106,7 @@ class TestPipelineFlow:
         fake_completion = MagicMock()
         fake_completion.choices[0].message.content = "# Fiche générée"
         fake_groq_client.chat.completions.create.return_value = fake_completion
-        monkeypatch.setattr(transcribe, "client", fake_groq_client)
+        monkeypatch.setattr(pipeline, "client", fake_groq_client)
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = _soumettre(client_app, files=files)
@@ -123,10 +123,10 @@ class TestPipelineFlow:
         fake_chunk.write_bytes(b"faux audio")
 
         monkeypatch.setattr(
-            transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
+            pipeline, "découper_audio", lambda *a, **k: [str(fake_chunk)]
         )
         monkeypatch.setattr(
-            transcribe,
+            pipeline,
             "transcrire_chunk",
             lambda path, retries=2: (
                 "Texte transcrit. ",
@@ -135,7 +135,7 @@ class TestPipelineFlow:
         )
 
         fake_groq_client = MagicMock()
-        monkeypatch.setattr(transcribe, "client", fake_groq_client)
+        monkeypatch.setattr(pipeline, "client", fake_groq_client)
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = _soumettre(client_app, files=files, data={"mode": "transcript"})
@@ -150,7 +150,7 @@ class TestPipelineFlow:
         fake_groq_client.chat.completions.create.assert_not_called()
 
     def test_mode_invalide(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = _soumettre(client_app, files=files, data={"mode": "bogus"})
@@ -161,10 +161,10 @@ class TestPipelineFlow:
         fake_chunk.write_bytes(b"faux audio")
 
         monkeypatch.setattr(
-            transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
+            pipeline, "découper_audio", lambda *a, **k: [str(fake_chunk)]
         )
         monkeypatch.setattr(
-            transcribe,
+            pipeline,
             "transcrire_chunk",
             lambda path, retries=2: (
                 "Transcribed text. ",
@@ -176,7 +176,7 @@ class TestPipelineFlow:
         fake_completion = MagicMock()
         fake_completion.choices[0].message.content = "# Generated sheet"
         fake_groq_client.chat.completions.create.return_value = fake_completion
-        monkeypatch.setattr(transcribe, "client", fake_groq_client)
+        monkeypatch.setattr(pipeline, "client", fake_groq_client)
 
         files = {"audio": ("class.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = _soumettre(client_app, files=files, data={"lang": "en"})
@@ -195,20 +195,20 @@ class TestPipelineFlow:
         fake_chunk_1.write_bytes(b"faux audio 1")
 
         monkeypatch.setattr(
-            transcribe,
+            pipeline,
             "découper_audio",
             lambda *a, **k: [str(fake_chunk_0), str(fake_chunk_1)],
         )
-        monkeypatch.setattr(transcribe, "CHUNK_DURATION", 3600)  # 1h par chunk
+        monkeypatch.setattr(pipeline, "CHUNK_DURATION", 3600)  # 1h par chunk
 
         segments_par_chunk = {
             str(fake_chunk_0): ("Début. ", [{"start": 0.0, "end": 2.0, "text": "Début."}]),
             str(fake_chunk_1): ("Suite. ", [{"start": 5.0, "end": 7.0, "text": "Suite."}]),
         }
         monkeypatch.setattr(
-            transcribe, "transcrire_chunk", lambda path, retries=2: segments_par_chunk[path]
+            pipeline, "transcrire_chunk", lambda path, retries=2: segments_par_chunk[path]
         )
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = _soumettre(client_app, files=files, data={"mode": "transcript"})
@@ -220,8 +220,8 @@ class TestPipelineFlow:
 
     def test_decoupage_echoue(self, client_app, monkeypatch):
         # découper_audio ne produit aucun chunk (fichier vide/corrompu)
-        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: [])
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "découper_audio", lambda *a, **k: [])
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = _soumettre(client_app, files=files)
@@ -232,14 +232,14 @@ class TestPipelineFlow:
         fake_chunk.write_bytes(b"faux audio")
 
         monkeypatch.setattr(
-            transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
+            pipeline, "découper_audio", lambda *a, **k: [str(fake_chunk)]
         )
 
         def _raise(*a, **k):
             raise RuntimeError("Transcription échouée après 2 tentatives")
 
-        monkeypatch.setattr(transcribe, "transcrire_chunk", _raise)
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "transcrire_chunk", _raise)
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = _soumettre(client_app, files=files)

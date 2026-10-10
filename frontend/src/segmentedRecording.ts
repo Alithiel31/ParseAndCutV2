@@ -1,3 +1,4 @@
+import { segmentFilename, sleep } from "./audioUtils";
 import { cancelRecording, createRecording, SegmentUploadError, uploadSegment } from "./api";
 import type { Lang } from "./i18n";
 import * as store from "./recordingStore";
@@ -33,14 +34,6 @@ interface PendingSegment {
   blob: Blob;
   attempts: number;
 }
-
-function extensionFor(mimeType: string): string {
-  if (mimeType.includes("mp4")) return "mp4";
-  if (mimeType.includes("ogg")) return "ogg";
-  return "webm";
-}
-
-const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
 function newLocalId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -327,7 +320,7 @@ export class SegmentedRecording {
           this.recordingId,
           segment.index,
           segment.blob,
-          `segment-${String(segment.index).padStart(4, "0")}.${extensionFor(segment.blob.type)}`,
+          segmentFilename(segment.index, segment.blob.type),
           this.lang
         );
         this.queue.shift();

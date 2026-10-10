@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.routers.transcribe as transcribe
+import app.services.pipeline as pipeline
 from app.main import app
 
 
@@ -63,7 +64,7 @@ class TestRateLimitPerRealClientIp:
 
 class TestUploadSizeLimit:
     def test_fichier_trop_gros_rejete(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
         monkeypatch.setattr(transcribe, "MAX_UPLOAD_SIZE_BYTES", 100)
 
         contenu = b"x" * 500  # dépasse largement la limite de test (100 octets)

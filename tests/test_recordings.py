@@ -13,7 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.routers.recordings as recordings_router
-import app.routers.transcribe as transcribe
+import app.services.pipeline as pipeline
 import app.services.recordings as recordings
 from app.main import app
 from test_transcribe_async import _attendre_fin_job
@@ -106,7 +106,7 @@ class TestServiceStockage:
 class TestRoutes:
     @pytest.fixture(autouse=True)
     def groq_configure(self, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
     def test_creation(self, client_app):
         resp = client_app.post("/api/recordings")
@@ -116,7 +116,7 @@ class TestRoutes:
         assert corps["segment_seconds"] > 0
 
     def test_creation_refusee_si_groq_non_configure(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", None)
+        monkeypatch.setattr(pipeline, "client", None)
         assert client_app.post("/api/recordings").status_code == 503
 
     def test_envoi_puis_etat(self, client_app):
@@ -228,7 +228,7 @@ class TestPipelineDeBoutEnBout:
 
     @pytest.fixture(autouse=True)
     def groq_configure(self, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
     def _envoyer(self, client_app, rec, tmp_path, durees):
         for i, duree in enumerate(durees):
@@ -243,7 +243,7 @@ class TestPipelineDeBoutEnBout:
             vus.append(path)
             return "Mot. ", [{"start": 1.0, "end": 2.0, "text": f"Segment {len(vus)}"}]
 
-        monkeypatch.setattr(transcribe, "transcrire_chunk", _transcrire)
+        monkeypatch.setattr(pipeline, "transcrire_chunk", _transcrire)
         rec = _creer(client_app)
         self._envoyer(client_app, rec, tmp_path, [3, 5, 2])
 
@@ -263,12 +263,12 @@ class TestPipelineDeBoutEnBout:
 
     def test_resume_sur_enregistrement_segmente(self, client_app, monkeypatch, tmp_path):
         monkeypatch.setattr(
-            transcribe, "transcrire_chunk",
+            pipeline, "transcrire_chunk",
             lambda path, retries=5: ("Du texte. ", [{"start": 0.0, "end": 1.0, "text": "Du texte."}]),
         )
         fake = MagicMock()
         fake.chat.completions.create.return_value.choices[0].message.content = "## Résumé\nOK"
-        monkeypatch.setattr(transcribe, "client", fake)
+        monkeypatch.setattr(pipeline, "client", fake)
         rec = _creer(client_app)
         self._envoyer(client_app, rec, tmp_path, [2, 2])
 
@@ -280,7 +280,7 @@ class TestPipelineDeBoutEnBout:
 
     def test_segment_illisible_ignore_les_autres_sont_traites(self, client_app, monkeypatch, tmp_path):
         monkeypatch.setattr(
-            transcribe, "transcrire_chunk",
+            pipeline, "transcrire_chunk",
             lambda path, retries=5: ("Bon. ", [{"start": 0.0, "end": 1.0, "text": "Bon."}]),
         )
         rec = _creer(client_app)
@@ -300,7 +300,7 @@ class TestPipelineDeBoutEnBout:
         client_app.post(f"/api/recordings/{rec}/segments/{index}", files=_segment(contenu, f"segment-{index}.webm"))
 
     def test_tout_illisible_echec_clair(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "transcrire_chunk", lambda *a, **k: ("x", []))
+        monkeypatch.setattr(pipeline, "transcrire_chunk", lambda *a, **k: ("x", []))
         rec = _creer(client_app)
         client_app.post(f"/api/recordings/{rec}/segments/0", files=_segment(b"corrompu"))
 
@@ -380,7 +380,7 @@ class TestTranscriptionAnticipee:
 
     @pytest.fixture(autouse=True)
     def configuration(self, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
         monkeypatch.setattr(recordings_router, "RECORDING_EARLY_TRANSCRIPTION", True)
 
     @pytest.fixture
@@ -391,7 +391,7 @@ class TestTranscriptionAnticipee:
             appels.append(path)
             return "Mot. ", [{"start": 1.0, "end": 2.0, "text": f"Segment {len(appels)}"}]
 
-        monkeypatch.setattr(transcribe, "transcrire_chunk", _transcrire)
+        monkeypatch.setattr(pipeline, "transcrire_chunk", _transcrire)
         return appels
 
     def _envoyer(self, client_app, rec, tmp_path, durees):
@@ -427,7 +427,7 @@ class TestTranscriptionAnticipee:
             time.sleep(1.0)
             return "Mot. ", [{"start": 0.0, "end": 1.0, "text": "Lent"}]
 
-        monkeypatch.setattr(transcribe, "transcrire_chunk", _lente)
+        monkeypatch.setattr(pipeline, "transcrire_chunk", _lente)
         rec = _creer(client_app)
         self._envoyer(client_app, rec, tmp_path, [2])
 
@@ -448,7 +448,7 @@ class TestTranscriptionAnticipee:
                 raise RuntimeError("quota épuisé pendant la réunion")
             return "Mot. ", [{"start": 0.0, "end": 1.0, "text": "Rattrapé"}]
 
-        monkeypatch.setattr(transcribe, "transcrire_chunk", _capricieuse)
+        monkeypatch.setattr(pipeline, "transcrire_chunk", _capricieuse)
         rec = _creer(client_app)
         self._envoyer(client_app, rec, tmp_path, [2])
         assert _attendre(lambda: len(appels) == 1)
@@ -493,7 +493,7 @@ class TestTranscriptionAnticipee:
 
     def test_sans_groq_aucune_tache_n_est_lancee(self, client_app, whisper, monkeypatch, tmp_path):
         rec = _creer(client_app)
-        monkeypatch.setattr(transcribe, "client", None)
+        monkeypatch.setattr(pipeline, "client", None)
         contenu = _webm(tmp_path / "x.webm", 2, 440)
         client_app.post(f"/api/recordings/{rec}/segments/0", files=_segment(contenu, "segment-0.webm"))
         time.sleep(0.3)

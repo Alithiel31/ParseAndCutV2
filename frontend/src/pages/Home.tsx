@@ -1,103 +1,36 @@
 import { useEffect, useRef, useState } from "react";
 import DropZone from "../components/DropZone";
 import AudioRecorder from "../components/AudioRecorder";
-import ProgressSteps, { STEPS } from "../components/ProgressSteps";
+import ModeSelector from "../components/ModeSelector";
+import ProgressSteps from "../components/ProgressSteps";
 import ResultView from "../components/ResultView";
-import { ApiError, cancelRecording, resumeTranscription, transcribeAudio, transcribeRecording, type JobProgress, type TranscribeMode, type TranscribeResult } from "../api";
-import { useLanguage, useTranslation, type Lang } from "../i18n";
+import { ApiError, cancelRecording, transcribeAudio, transcribeRecording, type TranscribeMode, type TranscribeResult } from "../api";
+import { useLanguage, useTranslation } from "../i18n";
 import RecoveryBanner from "../components/RecoveryBanner";
 import { discardInterrupted, findInterruptedRecordings, forgetLocalRecording, processInterrupted, type InterruptedRecording } from "../recovery";
 import type { RecordedUpload } from "../segmentedRecording";
-import { getPermission, isNotificationSupported, notifyResult, requestPermission } from "../notifications";
-
-type Phase = "idle" | "loading" | "done" | "error";
-
-const NOTIFY_STORAGE_KEY = "pac_notify";
-const PENDING_JOB_STORAGE_KEY = "pac_pending_job";
-
-interface PendingJob {
-  jobId: string;
-  mode: TranscribeMode;
-  lang: Lang;
-}
-
-function readPendingJob(): PendingJob | null {
-  try {
-    const value = localStorage.getItem(PENDING_JOB_STORAGE_KEY);
-    if (!value) return null;
-    const job = JSON.parse(value) as Partial<PendingJob>;
-    if (
-      typeof job.jobId !== "string" ||
-      !/^[\da-f]{32}$/i.test(job.jobId) ||
-      (job.mode !== "summary" && job.mode !== "transcript") ||
-      (job.lang !== "fr" && job.lang !== "en")
-    ) {
-      localStorage.removeItem(PENDING_JOB_STORAGE_KEY);
-      return null;
-    }
-    return job as PendingJob;
-  } catch {
-    return null;
-  }
-}
-
-function savePendingJob(job: PendingJob) {
-  try {
-    localStorage.setItem(PENDING_JOB_STORAGE_KEY, JSON.stringify(job));
-  } catch {
-    // Le suivi continue dans l'onglet même si le stockage local est indisponible.
-  }
-}
-
-function clearPendingJob() {
-  try {
-    localStorage.removeItem(PENDING_JOB_STORAGE_KEY);
-  } catch {
-    // Le job est terminé ; le stockage local peut être indisponible.
-  }
-}
+import { isNotificationSupported } from "../notifications";
+import { savePendingJob } from "../pendingJob";
+import { useNotifyPreference } from "../hooks/useNotifyPreference";
+import { useTranscriptionJob } from "../hooks/useTranscriptionJob";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<TranscribeMode>("summary");
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [activeStep, setActiveStep] = useState<string>(STEPS[0].id);
-  const [statusText, setStatusText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<TranscribeResult | null>(null);
-  const [partialTranscript, setPartialTranscript] = useState<string | null>(null);
   // Sauvegarde par segments de l'enregistrement micro courant (le fichier concerné est gardé pour le repérer).
   const [recordingUpload, setRecordingUpload] = useState<{ file: File; upload: RecordedUpload } | null>(null);
   // Enregistrements interrompus retrouvés sur l'appareil (le plus récent d'abord).
   const [interrupted, setInterrupted] = useState<InterruptedRecording[]>([]);
-  const [isResumed, setIsResumed] = useState(false);
   const [recorderBusy, setRecorderBusy] = useState(false);
-  const [notifyEnabled, setNotifyEnabled] = useState(() => {
-    try {
-      return localStorage.getItem(NOTIFY_STORAGE_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
+  const { notifyEnabled, setNotify } = useNotifyPreference();
+  const job = useTranscriptionJob({ notifyEnabled, onResume: setMode });
+  const { phase, error, setError, result, partialTranscript, startLoading, handleProgress, handleResult, handleJobError } = job;
   const resultRef = useRef<HTMLDivElement>(null);
-  const restoreStartedRef = useRef(false);
   const { t } = useTranslation();
   const { lang } = useLanguage();
 
   async function handleNotifyToggle(checked: boolean) {
-    if (checked) {
-      const permission = getPermission() === "granted" ? "granted" : await requestPermission();
-      if (permission !== "granted") {
-        setError(t("notify.blocked"));
-        return;
-      }
-    }
-    setNotifyEnabled(checked);
-    try {
-      localStorage.setItem(NOTIFY_STORAGE_KEY, String(checked));
-    } catch {
-      // navigation privée / stockage désactivé : la préférence reste valide pour la session en cours
-    }
+    if (!(await setNotify(checked))) setError(t("notify.blocked"));
   }
 
   useEffect(() => {
@@ -127,89 +60,16 @@ export default function Home() {
     };
   }, []);
 
-  useEffect(() => {
-    if (restoreStartedRef.current) return;
-    restoreStartedRef.current = true;
-
-    const pendingJob = readPendingJob();
-    if (!pendingJob) return;
-
-    setMode(pendingJob.mode);
-    setPhase("loading");
-    setIsResumed(true);
-    setStatusText(t("home.status.resuming"));
-    setError(null);
-
-    resumeTranscription(pendingJob.jobId, pendingJob.lang, handleProgress)
-      .then((data) => handleResult(data, pendingJob.mode))
-      .catch(handleJobError);
-    // The ref prevents StrictMode's development-only effect replay from polling twice.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function handleProgress(progress: JobProgress) {
-    if (progress.step === "cutting") {
-      setActiveStep("step-cut");
-      setStatusText(t("home.status.cutting"));
-    } else if (progress.step === "whisper") {
-      setActiveStep("step-whisper");
-      setStatusText(
-        progress.chunkTotal && progress.chunkTotal > 1
-          ? t("home.status.whisperProgress", {
-              current: progress.chunkCurrent ?? 1,
-              total: progress.chunkTotal,
-            })
-          : t("home.status.whisper")
-      );
-    } else if (progress.step === "llm") {
-      setActiveStep("step-llm");
-      setStatusText(
-        progress.summaryTotal && progress.summaryTotal > 1
-          ? t("home.status.structuringProgress", {
-              current: progress.summaryCurrent ?? 1,
-              total: progress.summaryTotal,
-            })
-          : t("home.status.structuring")
-      );
-    }
-  }
-
-  function handleResult(data: TranscribeResult, resultMode: TranscribeMode) {
-    clearPendingJob();
-    setResult(data);
-    setStatusText(resultMode === "summary" ? t("home.status.summaryDone") : t("home.status.transcriptDone"));
-    setPhase("done");
-    if (notifyEnabled && getPermission() === "granted") {
-      notifyResult(
-        t(resultMode === "summary" ? "notify.title.summary" : "notify.title.transcript"),
-        t(resultMode === "summary" ? "notify.body.summary" : "notify.body.transcript")
-      );
-    }
-  }
-
-  function handleJobError(e: unknown) {
-    clearPendingJob();
-    setError(e instanceof Error ? e.message : t("home.errors.unknown"));
-    setPartialTranscript(e instanceof ApiError && e.partialTranscript ? e.partialTranscript : null);
-    setPhase("error");
-  }
-
   async function handleResumeInterrupted() {
     const item = interrupted[0];
     if (!item || loading || recorderBusy) return;
-    setError(null);
-    setResult(null);
-    setPartialTranscript(null);
-    setPhase("loading");
-    setIsResumed(false);
-    setActiveStep(STEPS[0].id);
-    setStatusText(t("home.status.uploading"));
+    startLoading(t("home.status.uploading"));
 
     try {
       const data = await processInterrupted(item, {
         mode,
         lang,
-        onUploadProgress: (sent, total) => setStatusText(t("recovery.status.uploading", { sent, total })),
+        onUploadProgress: (sent, total) => job.setStatusText(t("recovery.status.uploading", { sent, total })),
         onProgress: handleProgress,
         onJobStarted: (jobId) => savePendingJob({ jobId, mode, lang }),
       });
@@ -233,13 +93,7 @@ export default function Home() {
       setError(t("home.errors.noFile"));
       return;
     }
-    setError(null);
-    setResult(null);
-    setPartialTranscript(null);
-    setPhase("loading");
-    setIsResumed(false);
-    setActiveStep(STEPS[0].id);
-    setStatusText(t("home.status.uploading"));
+    startLoading(t("home.status.uploading"));
 
     const segmented = recordingUpload && recordingUpload.file === file ? recordingUpload.upload : null;
     const onJobStarted = (jobId: string) => {
@@ -327,32 +181,7 @@ export default function Home() {
           </div>
         )}
 
-        <div className="mode-selector" role="radiogroup" aria-label={t("home.modeSelector.label")}>
-          <label className={`mode-option${mode === "summary" ? " active" : ""}`}>
-            <input
-              type="radio"
-              name="mode"
-              value="summary"
-              checked={mode === "summary"}
-              onChange={() => setMode("summary")}
-              disabled={controlsDisabled}
-            />
-            <span className="mode-icon" aria-hidden="true">✦</span>
-            <span className="mode-copy"><strong>{t("home.mode.summary")}</strong><small>{t("home.mode.summaryDescription")}</small></span>
-          </label>
-          <label className={`mode-option${mode === "transcript" ? " active" : ""}`}>
-            <input
-              type="radio"
-              name="mode"
-              value="transcript"
-              checked={mode === "transcript"}
-              onChange={() => setMode("transcript")}
-              disabled={controlsDisabled}
-            />
-            <span className="mode-icon" aria-hidden="true">≋</span>
-            <span className="mode-copy"><strong>{t("home.mode.transcript")}</strong><small>{t("home.mode.transcriptDescription")}</small></span>
-          </label>
-        </div>
+        <ModeSelector mode={mode} onChange={setMode} disabled={controlsDisabled} />
 
         {isNotificationSupported() && (
           <label className="notify-toggle">
@@ -384,10 +213,10 @@ export default function Home() {
         <div id="loader" className="processing-panel">
           <div className="processing-heading">
             <div className="spinner" aria-hidden="true" />
-            <div><strong>{t("home.progress.title")}</strong><p role="status" aria-live="polite" aria-atomic="true">{statusText}</p></div>
+            <div><strong>{t("home.progress.title")}</strong><p role="status" aria-live="polite" aria-atomic="true">{job.statusText}</p></div>
           </div>
-          <ProgressSteps activeId={activeStep} mode={mode} />
-          <p className="processing-note">{t(isResumed ? "home.progress.resumed" : "home.progress.note")}</p>
+          <ProgressSteps activeId={job.activeStep} mode={mode} />
+          <p className="processing-note">{t(job.isResumed ? "home.progress.resumed" : "home.progress.note")}</p>
         </div>
       )}
 

@@ -12,7 +12,6 @@ Seules les méthodes GET/POST sont utilisées : ce sont les seules autorisées p
 la config CORS (app/main.py). Le traitement lui-même réutilise le pipeline et le
 suivi de job de /api/transcribe (GET /api/transcribe/status/{job_id}).
 """
-import threading
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -24,9 +23,8 @@ from app.config import (
 )
 from app.i18n import SUPPORTED_LANGS, t
 from app.limiter import limiter
-from app.routers import transcribe
-from app.services import recordings
-from app.services.audio import ALLOWED_EXTENSIONS
+from app.routers.validation import valider_fichier_audio, valider_lang_et_mode
+from app.services import pipeline, recordings
 from app.services.jobs import create_job
 
 router = APIRouter()
@@ -55,7 +53,7 @@ def _exiger_enregistrement(rec_id: str, lang: str) -> None:
 def creer(request: Request, lang: str = LANGUAGE):
     lang = _langue(lang)
     # Mieux vaut refuser dès le début d'une réunion que 2 h plus tard.
-    if not transcribe.client:
+    if not pipeline.client:
         raise HTTPException(status_code=503, detail=t("groq_not_configured", lang))
 
     return JSONResponse({
@@ -96,15 +94,8 @@ def envoyer_segment(
         raise HTTPException(
             status_code=400, detail=t("segment_invalid_index", lang, max_index=MAX_SEGMENTS - 1)
         )
-    if audio is None or not audio.filename:
-        raise HTTPException(status_code=400, detail=t("no_audio_file", lang))
-
-    extension = audio.filename.rsplit(".", 1)[-1].lower() if "." in audio.filename else ""
-    if extension not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=415,
-            detail=t("unsupported_format", lang, formats=", ".join(sorted(ALLOWED_EXTENSIONS))),
-        )
+    valider_fichier_audio(audio, lang)
+    extension = audio.filename.rsplit(".", 1)[1].lower()
 
     try:
         recordings.enregistrer_segment(
@@ -120,7 +111,7 @@ def envoyer_segment(
 
     # Transcrit ce segment tout de suite, pendant que la réunion continue.
     if RECORDING_EARLY_TRANSCRIPTION:
-        transcribe.lancer_transcription_en_avance(rec_id, index)
+        pipeline.lancer_transcription_en_avance(rec_id, index)
 
     return {"index": index, "segments": recordings.indices_recus(rec_id)}
 
@@ -136,12 +127,7 @@ def terminer(
     """Vérifie que la suite de segments est complète, puis lance le même job de
     fond qu'un fichier envoyé d'un bloc. Le client suit ensuite le job avec
     GET /api/transcribe/status/{job_id}."""
-    if lang not in SUPPORTED_LANGS:
-        raise HTTPException(status_code=400, detail=t("invalid_lang", LANGUAGE))
-    if not transcribe.client:
-        raise HTTPException(status_code=503, detail=t("groq_not_configured", lang))
-    if mode not in ("summary", "transcript"):
-        raise HTTPException(status_code=400, detail=t("invalid_mode", lang))
+    valider_lang_et_mode(lang, mode)
     _exiger_enregistrement(rec_id, lang)
 
     if not recordings.indices_recus(rec_id):
@@ -159,11 +145,7 @@ def terminer(
         raise HTTPException(status_code=409, detail=t("recording_finished", lang))
 
     job_id = create_job()
-    threading.Thread(
-        target=transcribe._traiter_enregistrement,
-        args=(job_id, rec_id, mode, lang),
-        daemon=True,
-    ).start()
+    pipeline.en_tache_de_fond(pipeline.traiter_enregistrement, job_id, rec_id, mode, lang)
     return JSONResponse({"job_id": job_id}, status_code=202)
 
 
