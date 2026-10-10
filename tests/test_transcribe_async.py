@@ -17,7 +17,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-import app.routers.transcribe as transcribe
+import app.services.pipeline as pipeline
 from app.main import app
 
 
@@ -41,27 +41,27 @@ def _attendre_fin_job(client_app, job_id, timeout=5.0):
 
 class TestTranscribeStartValidation:
     def test_sans_fichier(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         resp = client_app.post("/api/transcribe/start")
         assert resp.status_code == 400
 
     def test_extension_refusee(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("notes.txt", b"pas de l'audio", "text/plain")}
         resp = client_app.post("/api/transcribe/start", files=files)
         assert resp.status_code == 415
 
     def test_groq_non_configure(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", None)
+        monkeypatch.setattr(pipeline, "client", None)
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = client_app.post("/api/transcribe/start", files=files)
         assert resp.status_code == 503
 
     def test_mode_invalide(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = client_app.post("/api/transcribe/start", files=files, data={"mode": "bogus"})
@@ -72,7 +72,7 @@ class TestTranscribeStartValidation:
         # immédiatement (job_id), avant même que le pipeline n'ait fini.
         #
         # Important : le test attend explicitement la fin du job (via
-        # _attendre_fin_job) avant de rendre la main. `_traiter_job` tourne
+        # _attendre_fin_job) avant de rendre la main. `pipeline.traiter_fichier` tourne
         # dans un vrai thread et résout découper_audio/transcrire_chunk/client
         # par lookup global à *chaque* appel — si ce thread survivait au-delà
         # du test, le monkeypatch teardown pourrait s'exécuter pendant qu'il
@@ -87,11 +87,11 @@ class TestTranscribeStartValidation:
             time.sleep(0.05)
             return [str(fake_chunk)]
 
-        monkeypatch.setattr(transcribe, "découper_audio", _decouper_lent)
+        monkeypatch.setattr(pipeline, "découper_audio", _decouper_lent)
         monkeypatch.setattr(
-            transcribe, "transcrire_chunk", lambda path, retries=2: ("Texte. ", [])
+            pipeline, "transcrire_chunk", lambda path, retries=2: ("Texte. ", [])
         )
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         avant = time.monotonic()
@@ -117,10 +117,10 @@ class TestTranscribeStatusRoute:
         fake_chunk.write_bytes(b"faux audio")
 
         monkeypatch.setattr(
-            transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
+            pipeline, "découper_audio", lambda *a, **k: [str(fake_chunk)]
         )
         monkeypatch.setattr(
-            transcribe,
+            pipeline,
             "transcrire_chunk",
             lambda path, retries=2: (
                 "Texte transcrit. ",
@@ -132,7 +132,7 @@ class TestTranscribeStatusRoute:
         fake_completion = MagicMock()
         fake_completion.choices[0].message.content = "# Fiche générée"
         fake_groq_client.chat.completions.create.return_value = fake_completion
-        monkeypatch.setattr(transcribe, "client", fake_groq_client)
+        monkeypatch.setattr(pipeline, "client", fake_groq_client)
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         start_resp = client_app.post("/api/transcribe/start", files=files)
@@ -153,12 +153,12 @@ class TestTranscribeStatusRoute:
         fake_chunk.write_bytes(b"faux audio")
 
         monkeypatch.setattr(
-            transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
+            pipeline, "découper_audio", lambda *a, **k: [str(fake_chunk)]
         )
         monkeypatch.setattr(
-            transcribe, "transcrire_chunk", lambda path, retries=2: ("Texte. ", [])
+            pipeline, "transcrire_chunk", lambda path, retries=2: ("Texte. ", [])
         )
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         start_resp = client_app.post(
@@ -173,8 +173,8 @@ class TestTranscribeStatusRoute:
         assert second.status_code == 404
 
     def test_echec_decoupage(self, client_app, monkeypatch):
-        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: [])
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "découper_audio", lambda *a, **k: [])
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         start_resp = client_app.post("/api/transcribe/start", files=files)
@@ -188,14 +188,14 @@ class TestTranscribeStatusRoute:
         fake_chunk.write_bytes(b"faux audio")
 
         monkeypatch.setattr(
-            transcribe, "découper_audio", lambda *a, **k: [str(fake_chunk)]
+            pipeline, "découper_audio", lambda *a, **k: [str(fake_chunk)]
         )
 
         def _raise(*a, **k):
             raise RuntimeError("Transcription échouée après 2 tentatives")
 
-        monkeypatch.setattr(transcribe, "transcrire_chunk", _raise)
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "transcrire_chunk", _raise)
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         files = {"audio": ("cours.mp3", b"faux contenu audio", "audio/mpeg")}
         start_resp = client_app.post("/api/transcribe/start", files=files)
@@ -224,8 +224,8 @@ class TestTranscriptionPartielle:
 
     def test_echec_au_second_chunk_renvoie_le_premier(self, client_app, monkeypatch, tmp_path):
         chunks = self._chunks(tmp_path, 2)
-        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         appels = []
 
@@ -235,7 +235,7 @@ class TestTranscriptionPartielle:
                 raise RuntimeError("quota Groq épuisé")
             return "Premier. ", [{"start": 0.0, "end": 2.0, "text": "Premier."}]
 
-        monkeypatch.setattr(transcribe, "transcrire_chunk", _transcrire)
+        monkeypatch.setattr(pipeline, "transcrire_chunk", _transcrire)
 
         resp = self._lancer(client_app)
 
@@ -246,14 +246,14 @@ class TestTranscriptionPartielle:
 
     def test_echec_du_resume_conserve_la_transcription_complete(self, client_app, monkeypatch, tmp_path):
         chunks = self._chunks(tmp_path, 1)
-        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(pipeline, "découper_audio", lambda *a, **k: chunks)
         monkeypatch.setattr(
-            transcribe, "transcrire_chunk",
+            pipeline, "transcrire_chunk",
             lambda path, retries=5: ("Cours. ", [{"start": 3.0, "end": 5.0, "text": "Cours."}]),
         )
         fake_groq = MagicMock()
         fake_groq.chat.completions.create.side_effect = ValueError("LLM indisponible")
-        monkeypatch.setattr(transcribe, "client", fake_groq)
+        monkeypatch.setattr(pipeline, "client", fake_groq)
 
         resp = self._lancer(client_app, mode="summary")
 
@@ -262,13 +262,13 @@ class TestTranscriptionPartielle:
 
     def test_echec_sans_rien_de_transcrit_garde_la_forme_habituelle(self, client_app, monkeypatch, tmp_path):
         chunks = self._chunks(tmp_path, 1)
-        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(pipeline, "client", MagicMock())
 
         def _raise(*a, **k):
             raise RuntimeError("échec immédiat")
 
-        monkeypatch.setattr(transcribe, "transcrire_chunk", _raise)
+        monkeypatch.setattr(pipeline, "transcrire_chunk", _raise)
 
         resp = self._lancer(client_app)
 
@@ -286,18 +286,18 @@ class TestChunksSilencieux:
             chunk = tmp_path / f"chunk_{i}.mp3"
             chunk.write_bytes(b"faux audio")
             chunks.append(str(chunk))
-        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: chunks)
+        monkeypatch.setattr(pipeline, "découper_audio", lambda *a, **k: chunks)
         monkeypatch.setattr(
-            transcribe, "est_silencieux", lambda path: silencieux[chunks.index(path)]
+            pipeline, "est_silencieux", lambda path: silencieux[chunks.index(path)]
         )
-        monkeypatch.setattr(transcribe, "client", MagicMock())
+        monkeypatch.setattr(pipeline, "client", MagicMock())
         appels = []
 
         def _transcrire(path, retries=5):
             appels.append(path)
             return "Du texte. ", [{"start": 1.0, "end": 2.0, "text": "Du texte."}]
 
-        monkeypatch.setattr(transcribe, "transcrire_chunk", _transcrire)
+        monkeypatch.setattr(pipeline, "transcrire_chunk", _transcrire)
         return chunks, appels
 
     def _lancer(self, client_app, mode="transcript"):
@@ -335,10 +335,10 @@ class TestResumeParBlocsDansLeJob:
 
         chunk = tmp_path / "chunk_0.mp3"
         chunk.write_bytes(b"faux audio")
-        monkeypatch.setattr(transcribe, "découper_audio", lambda *a, **k: [str(chunk)])
+        monkeypatch.setattr(pipeline, "découper_audio", lambda *a, **k: [str(chunk)])
         long_texte = " ".join(f"Phrase {i} " + "y" * 40 + "." for i in range(30))
         monkeypatch.setattr(
-            transcribe, "transcrire_chunk",
+            pipeline, "transcrire_chunk",
             lambda path, retries=5: (long_texte, [{"start": 0.0, "end": 1.0, "text": long_texte}]),
         )
 
@@ -352,7 +352,7 @@ class TestResumeParBlocsDansLeJob:
 
         fake_groq = MagicMock()
         fake_groq.chat.completions.create.side_effect = _create
-        monkeypatch.setattr(transcribe, "client", fake_groq)
+        monkeypatch.setattr(pipeline, "client", fake_groq)
 
         files = {"audio": ("reunion.mp3", b"faux contenu audio", "audio/mpeg")}
         resp = client_app.post("/api/transcribe/start", files=files)
