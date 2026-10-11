@@ -32,6 +32,7 @@
 - [Déploiement (Docker + Raspberry Pi)](#déploiement-docker--raspberry-pi)
 - [Tests & CI](#tests--ci)
 - [Releases & versioning](#releases--versioning)
+- [Documentation](#documentation)
 - [Contribuer](#contribuer)
 - [Licence](#licence)
 
@@ -188,6 +189,20 @@ git push origin vX.Y.Z
 ```
 
 Une Release GitHub est ensuite créée à partir du tag, avec sa description reprise de la section correspondante du `CHANGELOG.md`.
+
+## Documentation
+
+| Guide | Contenu |
+|---|---|
+| [`docs/architecture.fr.md`](./docs/architecture.fr.md) | Modèle de job asynchrone, pipeline de traitement, enregistrement par segments, couches de sécurité, structure du dépôt |
+| [`docs/environment.fr.md`](./docs/environment.fr.md) | Toutes les variables d'environnement, constantes codées en dur, secrets de déploiement et de CI |
+| [`docs/development.fr.md`](./docs/development.fr.md) | Lancer le projet en local, routes et codes d'erreur, tests, CI |
+| [`docs/DEPLOY_PI.md`](./docs/DEPLOY_PI.md) | Docker context, Traefik, ingress Cloudflare, Infisical |
+| [`docs/handover-guide.fr.md`](./docs/handover-guide.fr.md) | Ce qui tourne où, accès nécessaires, remise en service à partir de zéro, risques connus |
+| [`docs/Troubleshooting.fr.md`](./docs/Troubleshooting.fr.md) | Incidents déjà rencontrés, avec la démarche de diagnostic |
+| [`docs/CONTRIBUTING.fr.md`](./docs/CONTRIBUTING.fr.md) · [`docs/SECURITY.fr.md`](./docs/SECURITY.fr.md) · [`docs/SUPPORT.fr.md`](./docs/SUPPORT.fr.md) · [`docs/CODE_OF_CONDUCT.fr.md`](./docs/CODE_OF_CONDUCT.fr.md) | Fichiers communautaires |
+
+Chaque guide existe aussi en anglais (sans suffixe).
 
 ## Contribuer
 
