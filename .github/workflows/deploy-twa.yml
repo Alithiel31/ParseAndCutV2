@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Download AAB artifact
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@v27
         with:
           workflow: build-twa.yml
           name: parseandcut-release
