@@ -1,5 +1,5 @@
 # Serveur ASGI (dev + prod, remplace Flask/Gunicorn)
-fastapi==0.141.1
+fastapi==0.143.0
 uvicorn==0.54.0
 
 # Upload de fichiers multipart (requis par FastAPI pour UploadFile)
