@@ -3,7 +3,7 @@ fastapi==0.143.2
 uvicorn==0.54.0
 
 # Upload de fichiers multipart (requis par FastAPI pour UploadFile)
-python-multipart==0.0.32
+python-multipart==0.0.33
 
 # API Groq
 groq==1.7.0
